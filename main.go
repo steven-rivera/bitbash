@@ -120,8 +120,11 @@ func cdCommand(args []string) error {
 	}
 
 	dir := args[0]
-	err := os.Chdir(dir)
-	if err != nil {
+	if dir == "~" {
+		dir, _ = os.UserHomeDir()
+	}
+
+	if err := os.Chdir(dir); err != nil {
 		return fmt.Errorf("cd: %s: No such file or directory", dir)
 	}
 	return nil
