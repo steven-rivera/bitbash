@@ -10,6 +10,7 @@ import (
 
 func main() {
 	stdin := bufio.NewReader(os.Stdin)
+	commands := getBuitInCommands()
 
 	for {
 		fmt.Print("$ ")
@@ -35,6 +36,24 @@ func main() {
 			continue
 		}
 
+		if strings.HasPrefix(command, "type ") {
+			split := strings.SplitAfterN(command, " ", 2)
+			if _, ok := commands[split[1]]; ok {
+				fmt.Printf("%s is a shell builtin\n", split[1])
+			} else {
+				fmt.Printf("%s: not found\n", split[1])
+			}
+			continue
+		}
+
 		fmt.Println(command + ": command not found")
+	}
+}
+
+func getBuitInCommands() map[string]bool {
+	return map[string]bool{
+		"exit": true,
+		"echo": true,
+		"type": true,
 	}
 }
