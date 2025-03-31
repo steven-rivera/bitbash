@@ -46,6 +46,7 @@ func getBuiltInCommands() map[string]BuiltIn {
 		"exit": exitCommand,
 		"echo": echoCommand,
 		"type": typeCommand,
+		"pwd":  pwdCommand,
 	}
 }
 
@@ -100,5 +101,14 @@ func runProgram(program string, args []string) error {
 	}
 	stdOutandErr, _ := cmd.CombinedOutput()
 	fmt.Printf("%s", stdOutandErr)
+	return nil
+}
+
+func pwdCommand(args []string) error {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("pwd: %w", err)
+	}
+	fmt.Println(workingDir)
 	return nil
 }
