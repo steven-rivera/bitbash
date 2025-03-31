@@ -20,12 +20,19 @@ func main() {
 		}
 		command = strings.TrimSuffix(command, "\n")
 
-		if strings.HasPrefix(command, "exit") {
+		if strings.HasPrefix(command, "exit ") {
 			split := strings.SplitAfterN(command, " ", 2)
 			exitCode, err := strconv.Atoi(split[1])
-			if err == nil {
-				os.Exit(exitCode)
+			if err != nil {
+				fmt.Printf("exit: invalid exit code '%s'\n", split[1])
 			}
+			os.Exit(exitCode)
+		}
+
+		if strings.HasPrefix(command, "echo ") {
+			split := strings.SplitAfterN(command, " ", 2)
+			fmt.Println(split[1])
+			continue
 		}
 
 		fmt.Println(command + ": command not found")
