@@ -47,6 +47,7 @@ func getBuiltInCommands() map[string]BuiltIn {
 		"echo": echoCommand,
 		"type": typeCommand,
 		"pwd":  pwdCommand,
+		"cd":   cdCommand,
 	}
 }
 
@@ -110,5 +111,18 @@ func pwdCommand(args []string) error {
 		return fmt.Errorf("pwd: %w", err)
 	}
 	fmt.Println(workingDir)
+	return nil
+}
+
+func cdCommand(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("cd: expected 1 argument got %d", len(args))
+	}
+
+	dir := args[0]
+	err := os.Chdir(dir)
+	if err != nil {
+		return fmt.Errorf("cd: %s: No such file or directory", dir)
+	}
 	return nil
 }
