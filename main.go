@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-type BuiltIn = func(args []string, out *os.File) error
+type BuiltIn = func(args []string, outFile *os.File, errFile *os.File) error
 
 func main() {
 	stdin := bufio.NewReader(os.Stdin)
@@ -27,26 +27,29 @@ func main() {
 		splitInput := strings.Split(input, " ")
 		command, args := splitInput[0], splitInput[1:]
 
-		args, outputFile, err := parseRedirection(args)
+		args, outputFile, errFile, err := parseRedirection(args)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
 
 		if callback, ok := builtInCommands[command]; ok {
-			err := callback(args, outputFile)
+			err := callback(args, outputFile, errFile)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(errFile, err)
 			}
 		} else {
-			err := runProgram(command, args, outputFile)
+			err := runProgram(command, args, outputFile, errFile)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
+				fmt.Fprintln(errFile, err)
 			}
 		}
 
 		if outputFile != os.Stdout {
 			outputFile.Close()
+		}
+		if errFile != os.Stderr {
+			errFile.Close()
 		}
 	}
 }
@@ -61,7 +64,7 @@ func getBuiltInCommands() map[string]BuiltIn {
 	}
 }
 
-func exitCommand(args []string, out *os.File) error {
+func exitCommand(args []string, outFile *os.File, errFile *os.File) error {
 	if len(args) != 1 {
 		return fmt.Errorf("exit: expected 1 argument got %d", len(args))
 	}
@@ -74,21 +77,21 @@ func exitCommand(args []string, out *os.File) error {
 	return nil
 }
 
-func echoCommand(args []string, out *os.File) error {
+func echoCommand(args []string, outFile *os.File, errFile *os.File) error {
 	for _, arg := range args {
-		fmt.Fprintf(out, "%s ", strings.Trim(arg, "'\""))
+		fmt.Fprintf(outFile, "%s ", strings.Trim(arg, "'\""))
 	}
-	fmt.Fprintln(out)
+	fmt.Fprintln(outFile)
 	return nil
 }
 
-func typeCommand(args []string, out *os.File) error {
+func typeCommand(args []string, outFile *os.File, errFile *os.File) error {
 	if len(args) != 1 {
 		return fmt.Errorf("exit: expected 1 argument got %d", len(args))
 	}
 	commandArg := args[0]
 	if _, ok := getBuiltInCommands()[commandArg]; ok {
-		fmt.Fprintf(out, "%s is a shell builtin\n", commandArg)
+		fmt.Fprintf(outFile, "%s is a shell builtin\n", commandArg)
 		return nil
 	}
 
@@ -97,7 +100,7 @@ func typeCommand(args []string, out *os.File) error {
 		commandPath := filepath.Join(path, commandArg)
 		file, err := os.Stat(commandPath)
 		if err == nil && !file.IsDir() {
-			fmt.Fprintf(out, "%s is %s\n", commandArg, commandPath)
+			fmt.Fprintf(outFile, "%s is %s\n", commandArg, commandPath)
 			return nil
 		}
 	}
@@ -105,27 +108,27 @@ func typeCommand(args []string, out *os.File) error {
 	return fmt.Errorf("%s: not found", commandArg)
 }
 
-func runProgram(program string, args []string, out *os.File) error {
+func runProgram(program string, args []string, outFile *os.File, errFile *os.File) error {
 	cmd := exec.Command(program, args...)
 	if cmd.Err != nil {
 		return fmt.Errorf("%s: command not found", program)
 	}
-	cmd.Stdout = out
-	cmd.Stderr = os.Stdin
+	cmd.Stdout = outFile
+	cmd.Stderr = errFile
 	cmd.Run()
 	return nil
 }
 
-func pwdCommand(args []string, out *os.File) error {
+func pwdCommand(args []string, outFile *os.File, errFile *os.File) error {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("pwd: %w", err)
 	}
-	fmt.Fprintln(out, workingDir)
+	fmt.Fprintln(outFile, workingDir)
 	return nil
 }
 
-func cdCommand(args []string, out *os.File) error {
+func cdCommand(args []string, outFile *os.File, errFile *os.File) error {
 	if len(args) != 1 {
 		return fmt.Errorf("cd: expected 1 argument got %d", len(args))
 	}
@@ -141,19 +144,25 @@ func cdCommand(args []string, out *os.File) error {
 	return nil
 }
 
-func parseRedirection(args []string) (commandArgs []string, outputFile *os.File, err error) {
+func parseRedirection(args []string) (commandArgs []string, outFile *os.File, errFile *os.File, err error) {
 	for index, arg := range args {
-		if arg == ">" || arg == "1>" {
+		if arg == ">" || arg == "1>" || arg == "2>" {
 			commandArgs, filePathSlice := args[:index], args[index+1:]
 			if len(filePathSlice) != 1 {
-				return nil, nil, fmt.Errorf("%s: expected 1 argument got %d", arg, len(filePathSlice))
+				return nil, nil, nil, fmt.Errorf("%s: expected 1 argument got %d", arg, len(filePathSlice))
 			}
 			file, err := os.Create(filePathSlice[0])
 			if err != nil {
-				return nil, nil, fmt.Errorf("%s: %w", arg, err)
+				return nil, nil, nil, fmt.Errorf("%s: %w", arg, err)
 			}
-			return commandArgs, file, nil
+
+			switch arg {
+			case "2>":
+				return commandArgs, os.Stdout, file, nil
+			default:
+				return commandArgs, file, os.Stderr, nil
+			}
 		}
 	}
-	return args, os.Stdout, nil
+	return args, os.Stdout, os.Stderr, nil
 }
