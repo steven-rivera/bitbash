@@ -23,9 +23,21 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Error reading input:", err)
 			os.Exit(1)
 		}
-		input = strings.TrimSuffix(input, "\n")
-		splitInput := strings.Split(input, " ")
-		command, args := splitInput[0], splitInput[1:]
+		input = strings.TrimSpace(input)
+		splitInput := strings.SplitN(input, " ", 2)
+
+		command := splitInput[0]
+		argStr := ""
+		if len(splitInput) == 2 {
+			argStr = splitInput[1]
+		}
+		// fmt.Printf("cmd: `%s`, argStr: `%s`\n", splitInput[0], argStr)
+		args, err := coalesceQuotes(argStr)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error parsing input:", err)
+			os.Exit(1)
+		}
+		//fmt.Printf("cmd: `%s`, args: %#v\n", command, args)
 
 		args, outputFile, errFile, err := parseRedirection(args)
 		if err != nil {
@@ -163,7 +175,7 @@ func parseRedirection(args []string) (commandArgs []string, outFile *os.File, er
 				return commandArgs, file, os.Stderr, nil
 			}
 		}
-		if arg == ">>" || arg == "1>>" || arg == "2>>"{
+		if arg == ">>" || arg == "1>>" || arg == "2>>" {
 			commandArgs, filePathSlice := args[:index], args[index+1:]
 			if len(filePathSlice) != 1 {
 				return nil, nil, nil, fmt.Errorf("%s: expected 1 argument got %d", arg, len(filePathSlice))
@@ -182,4 +194,42 @@ func parseRedirection(args []string) (commandArgs []string, outFile *os.File, er
 		}
 	}
 	return args, os.Stdout, os.Stderr, nil
+}
+
+func coalesceQuotes(argStr string) ([]string, error) {
+	if argStr == "" {
+		return []string{}, nil
+	}
+
+	if strings.Count(argStr, "'")%2 != 0 {
+		return []string{}, fmt.Errorf("missing closing quote")
+	}
+
+	coalescedArgs := make([]string, 0)
+	currentArg := strings.Builder{}
+	inQuotes := false
+	for i := 0; i < len(argStr); i++ {
+		char := argStr[i]
+
+		if char == '\'' {
+			inQuotes = !inQuotes
+			continue
+		}
+
+		if char == ' ' && !inQuotes {
+			if currentArg.Len() > 0 {
+				coalescedArgs = append(coalescedArgs, currentArg.String())
+				currentArg.Reset()
+			}
+			continue
+		}
+
+		currentArg.WriteByte(char)
+	}
+
+	if currentArg.Len() > 0 {
+		coalescedArgs = append(coalescedArgs, currentArg.String())
+	}
+
+	return coalescedArgs, nil
 }
