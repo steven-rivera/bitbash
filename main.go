@@ -37,7 +37,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Error parsing input:", err)
 			os.Exit(1)
 		}
-		//fmt.Printf("cmd: `%s`, args: %#v\n", command, args)
+		// fmt.Printf("cmd: `%s`, args: %#v\n", command, args)
 
 		args, outputFile, errFile, err := parseRedirection(args)
 		if err != nil {
@@ -201,22 +201,30 @@ func coalesceQuotes(argStr string) ([]string, error) {
 		return []string{}, nil
 	}
 
-	if strings.Count(argStr, "'")%2 != 0 {
+	if strings.Count(argStr, "'")%2 != 0 && strings.Count(argStr, "\"")%2 != 0 {
 		return []string{}, fmt.Errorf("missing closing quote")
 	}
 
 	coalescedArgs := make([]string, 0)
 	currentArg := strings.Builder{}
-	inQuotes := false
+	inSingleQuotes, inDoubleQuotes := false, false
 	for i := 0; i < len(argStr); i++ {
 		char := argStr[i]
 
 		if char == '\'' {
-			inQuotes = !inQuotes
-			continue
+			if !inDoubleQuotes {
+				inSingleQuotes = !inSingleQuotes
+				continue
+			}
+		}
+		if char == '"' {
+			if !inSingleQuotes {
+				inDoubleQuotes = !inDoubleQuotes
+				continue
+			}
 		}
 
-		if char == ' ' && !inQuotes {
+		if char == ' ' && !inSingleQuotes && !inDoubleQuotes {
 			if currentArg.Len() > 0 {
 				coalescedArgs = append(coalescedArgs, currentArg.String())
 				currentArg.Reset()
