@@ -163,6 +163,23 @@ func parseRedirection(args []string) (commandArgs []string, outFile *os.File, er
 				return commandArgs, file, os.Stderr, nil
 			}
 		}
+		if arg == ">>" || arg == "1>>" || arg == "2>>"{
+			commandArgs, filePathSlice := args[:index], args[index+1:]
+			if len(filePathSlice) != 1 {
+				return nil, nil, nil, fmt.Errorf("%s: expected 1 argument got %d", arg, len(filePathSlice))
+			}
+			file, err := os.OpenFile(filePathSlice[0], os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o666)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("%s: %w", arg, err)
+			}
+
+			switch arg {
+			case "2>>":
+				return commandArgs, os.Stdout, file, nil
+			default:
+				return commandArgs, file, os.Stderr, nil
+			}
+		}
 	}
 	return args, os.Stdout, os.Stderr, nil
 }
