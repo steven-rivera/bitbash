@@ -91,7 +91,7 @@ func exitCommand(args []string, outFile *os.File, errFile *os.File) error {
 
 func echoCommand(args []string, outFile *os.File, errFile *os.File) error {
 	for _, arg := range args {
-		fmt.Fprintf(outFile, "%s ", strings.Trim(arg, "'\""))
+		fmt.Fprintf(outFile, "%s ", arg)
 	}
 	fmt.Fprintln(outFile)
 	return nil
@@ -222,6 +222,14 @@ func coalesceQuotes(argStr string) ([]string, error) {
 				inDoubleQuotes = !inDoubleQuotes
 				continue
 			}
+		}
+
+		if char == '\\' && !inSingleQuotes && !inDoubleQuotes {
+			if i+1 < len(argStr) {
+				currentArg.WriteByte(argStr[i+1])
+				i++
+			}
+			continue
 		}
 
 		if char == ' ' && !inSingleQuotes && !inDoubleQuotes {
