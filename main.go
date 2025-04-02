@@ -224,12 +224,25 @@ func coalesceQuotes(argStr string) ([]string, error) {
 			}
 		}
 
-		if char == '\\' && !inSingleQuotes && !inDoubleQuotes {
-			if i+1 < len(argStr) {
-				currentArg.WriteByte(argStr[i+1])
-				i++
+		if char == '\\' {
+			if !inSingleQuotes && !inDoubleQuotes {
+				if i+1 < len(argStr) {
+					currentArg.WriteByte(argStr[i+1])
+					i++
+				}
+				continue
 			}
-			continue
+
+			if inDoubleQuotes {
+				if i+1 < len(argStr) {
+					switch argStr[i+1] {
+					case '\\', '$', '"':
+						currentArg.WriteByte(argStr[i+1])
+						i++
+						continue
+					}
+				}
+			}
 		}
 
 		if char == ' ' && !inSingleQuotes && !inDoubleQuotes {
