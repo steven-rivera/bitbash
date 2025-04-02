@@ -24,19 +24,15 @@ func main() {
 			os.Exit(1)
 		}
 		input = strings.TrimSpace(input)
-		splitInput := strings.SplitN(input, " ", 2)
-
-		command := splitInput[0]
-		argStr := ""
-		if len(splitInput) == 2 {
-			argStr = splitInput[1]
-		}
-		// fmt.Printf("cmd: `%s`, argStr: `%s`\n", splitInput[0], argStr)
-		args, err := coalesceQuotes(argStr)
+		splitInput, err := coalesceQuotes(input)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error parsing input:", err)
 			os.Exit(1)
 		}
+
+		command := splitInput[0]
+		args := splitInput[1:]
+		
 		// fmt.Printf("cmd: `%s`, args: %#v\n", command, args)
 
 		args, outputFile, errFile, err := parseRedirection(args)
