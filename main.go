@@ -2,26 +2,33 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 type BuiltIn = func(args []string, outFile *os.File, errFile *os.File) error
 
 func main() {
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		panic(err)
+	}
+	defer term.Restore(int(os.Stdin.Fd()), oldState)
+
 	stdin := bufio.NewReader(os.Stdin)
 	builtInCommands := getBuiltInCommands()
 
 	for {
-		fmt.Print("$ ")
-		input, err := stdin.ReadString('\n')
+		input, err := readLine(stdin)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error reading input:", err)
-			os.Exit(1)
+			break
 		}
 		input = strings.TrimSpace(input)
 		splitInput, err := coalesceQuotes(input)
@@ -30,9 +37,12 @@ func main() {
 			os.Exit(1)
 		}
 
+		if len(splitInput) == 0 {
+			continue
+		}
 		command := splitInput[0]
 		args := splitInput[1:]
-		
+
 		// fmt.Printf("cmd: `%s`, args: %#v\n", command, args)
 
 		args, outputFile, errFile, err := parseRedirection(args)
@@ -44,12 +54,12 @@ func main() {
 		if callback, ok := builtInCommands[command]; ok {
 			err := callback(args, outputFile, errFile)
 			if err != nil {
-				fmt.Fprintln(errFile, err)
+				fmt.Fprintf(errFile, "%s\r\n", err)
 			}
 		} else {
 			err := runProgram(command, args, outputFile, errFile)
 			if err != nil {
-				fmt.Fprintln(errFile, err)
+				fmt.Fprintf(errFile, "%s\r\n", err)
 			}
 		}
 
@@ -60,6 +70,48 @@ func main() {
 			errFile.Close()
 		}
 	}
+}
+
+func readLine(stdin *bufio.Reader) (string, error) {
+	fmt.Print("$ ")
+	currentLine := strings.Builder{}
+	for {
+		char, err := stdin.ReadByte()
+		if err != nil {
+			return "", fmt.Errorf("Error reading input: %w", err)
+		}
+
+		if char == '\n' || char == '\r' {
+			fmt.Print("\r\n")
+			break
+		}
+		if char == '\t' {
+			complete := autoComplete(currentLine.String())
+			if complete != "" {
+				fmt.Printf("\r\x1b[0K$ %s ", complete)
+				currentLine.Reset()
+				currentLine.WriteString(fmt.Sprintf("%s ", complete))
+			}
+			continue
+		}
+		if char == 3 {
+			return "", fmt.Errorf("Siginterupt")
+		}
+
+		currentLine.WriteByte(char)
+		fmt.Printf("%c", char)
+
+	}
+	return currentLine.String(), nil
+}
+
+func autoComplete(partial string) string {
+	for command, _ := range getBuiltInCommands() {
+		if strings.HasPrefix(command, partial) {
+			return command
+		}
+	}
+	return ""
 }
 
 func getBuiltInCommands() map[string]BuiltIn {
@@ -89,7 +141,7 @@ func echoCommand(args []string, outFile *os.File, errFile *os.File) error {
 	for _, arg := range args {
 		fmt.Fprintf(outFile, "%s ", arg)
 	}
-	fmt.Fprintln(outFile)
+	fmt.Fprint(outFile, "\r\n")
 	return nil
 }
 
@@ -99,7 +151,7 @@ func typeCommand(args []string, outFile *os.File, errFile *os.File) error {
 	}
 	commandArg := args[0]
 	if _, ok := getBuiltInCommands()[commandArg]; ok {
-		fmt.Fprintf(outFile, "%s is a shell builtin\n", commandArg)
+		fmt.Fprintf(outFile, "%s is a shell builtin\r\n", commandArg)
 		return nil
 	}
 
@@ -108,7 +160,7 @@ func typeCommand(args []string, outFile *os.File, errFile *os.File) error {
 		commandPath := filepath.Join(path, commandArg)
 		file, err := os.Stat(commandPath)
 		if err == nil && !file.IsDir() {
-			fmt.Fprintf(outFile, "%s is %s\n", commandArg, commandPath)
+			fmt.Fprintf(outFile, "%s is %s\r\n", commandArg, commandPath)
 			return nil
 		}
 	}
@@ -121,9 +173,20 @@ func runProgram(program string, args []string, outFile *os.File, errFile *os.Fil
 	if cmd.Err != nil {
 		return fmt.Errorf("%s: command not found", program)
 	}
-	cmd.Stdout = outFile
-	cmd.Stderr = errFile
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
 	cmd.Run()
+
+	if stdout.Len() != 0 {
+		fmt.Fprint(outFile, strings.ReplaceAll(stdout.String(), "\n", "\r\n"))
+	}
+	if stderr.Len() != 0 {
+		fmt.Fprint(errFile, strings.ReplaceAll(stderr.String(), "\n", "\r\n"))
+	}
+
 	return nil
 }
 
@@ -132,7 +195,7 @@ func pwdCommand(args []string, outFile *os.File, errFile *os.File) error {
 	if err != nil {
 		return fmt.Errorf("pwd: %w", err)
 	}
-	fmt.Fprintln(outFile, workingDir)
+	fmt.Fprintf(outFile, "%s\r\n", workingDir)
 	return nil
 }
 
