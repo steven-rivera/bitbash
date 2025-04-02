@@ -113,6 +113,30 @@ func autoComplete(partial string) string {
 			return command
 		}
 	}
+
+	pathEnv := os.Getenv("PATH")
+	for dir := range strings.SplitSeq(pathEnv, ":") {
+		stack := []string{dir}
+
+		for len(stack) > 0 {
+			currentDir := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			entries, err := os.ReadDir(currentDir)
+			if err != nil {
+				continue
+			}
+
+			for _, entry := range entries {
+				if entry.IsDir() {
+					stack = append(stack, filepath.Join(currentDir, entry.Name()))
+				} else if strings.HasPrefix(entry.Name(), partial) {
+					return entry.Name()
+				}
+			}
+		}
+	}
+
 	return ""
 }
 
@@ -158,12 +182,26 @@ func typeCommand(args []string, outFile *os.File, errFile *os.File) error {
 	}
 
 	pathEnv := os.Getenv("PATH")
-	for path := range strings.SplitSeq(pathEnv, ":") {
-		commandPath := filepath.Join(path, commandArg)
-		file, err := os.Stat(commandPath)
-		if err == nil && !file.IsDir() {
-			fmt.Fprintf(outFile, "%s is %s\r\n", commandArg, commandPath)
-			return nil
+	for dir := range strings.SplitSeq(pathEnv, ":") {
+		stack := []string{dir}
+
+		for len(stack) > 0 {
+			currentDir := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
+			dirEntries, err := os.ReadDir(currentDir)
+			if err != nil {
+				continue
+			}
+
+			for _, dirEntry := range dirEntries {
+				if dirEntry.IsDir() {
+					stack = append(stack, filepath.Join(currentDir, dirEntry.Name()))
+				} else if dirEntry.Name() == commandArg {
+					fmt.Fprintf(outFile, "%s is %s\r\n", commandArg, filepath.Join(currentDir, commandArg))
+					return nil
+				}
+			}
 		}
 	}
 
