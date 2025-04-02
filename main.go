@@ -91,6 +91,8 @@ func readLine(stdin *bufio.Reader) (string, error) {
 				fmt.Printf("\r\x1b[0K$ %s ", complete)
 				currentLine.Reset()
 				currentLine.WriteString(fmt.Sprintf("%s ", complete))
+			} else {
+				fmt.Print("\a")
 			}
 			continue
 		}
