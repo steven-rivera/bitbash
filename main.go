@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -75,6 +76,7 @@ func main() {
 func readLine(stdin *bufio.Reader) (string, error) {
 	fmt.Print("$ ")
 	currentLine := strings.Builder{}
+	multipleMatch := false
 	for {
 		char, err := stdin.ReadByte()
 		if err != nil {
@@ -86,13 +88,20 @@ func readLine(stdin *bufio.Reader) (string, error) {
 			break
 		}
 		if char == '\t' {
-			complete := autoComplete(currentLine.String())
-			if complete != "" {
-				fmt.Printf("\r\x1b[0K$ %s ", complete)
+			matches := autoComplete(currentLine.String())
+			if len(matches) == 0 {
+				fmt.Print("\a")
+			} else if len(matches) == 1 {
+				fmt.Printf("\r\x1b[0K$ %s ", matches[0])
 				currentLine.Reset()
-				currentLine.WriteString(fmt.Sprintf("%s ", complete))
+				currentLine.WriteString(fmt.Sprintf("%s ", matches[0]))
+			} else if multipleMatch {
+				slices.Sort(matches)
+				fmt.Printf("\r\n%s\r\n", strings.Join(matches, "  "))
+				fmt.Printf("$ %s", currentLine.String())
 			} else {
 				fmt.Print("\a")
+				multipleMatch = true
 			}
 			continue
 		}
@@ -102,42 +111,34 @@ func readLine(stdin *bufio.Reader) (string, error) {
 
 		currentLine.WriteByte(char)
 		fmt.Printf("%c", char)
+		multipleMatch = false
 
 	}
 	return currentLine.String(), nil
 }
 
-func autoComplete(partial string) string {
+func autoComplete(partial string) []string {
+	matches := make([]string, 0)
 	for command, _ := range getBuiltInCommands() {
 		if strings.HasPrefix(command, partial) {
-			return command
+			return append(matches, command)
 		}
 	}
 
 	pathEnv := os.Getenv("PATH")
 	for dir := range strings.SplitSeq(pathEnv, ":") {
-		stack := []string{dir}
-
-		for len(stack) > 0 {
-			currentDir := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-
-			entries, err := os.ReadDir(currentDir)
-			if err != nil {
-				continue
-			}
-
-			for _, entry := range entries {
-				if entry.IsDir() {
-					stack = append(stack, filepath.Join(currentDir, entry.Name()))
-				} else if strings.HasPrefix(entry.Name(), partial) {
-					return entry.Name()
-				}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasPrefix(entry.Name(), partial) {
+				matches = append(matches, entry.Name())
 			}
 		}
 	}
 
-	return ""
+	return matches
 }
 
 func getBuiltInCommands() map[string]BuiltIn {
@@ -183,24 +184,15 @@ func typeCommand(args []string, outFile *os.File, errFile *os.File) error {
 
 	pathEnv := os.Getenv("PATH")
 	for dir := range strings.SplitSeq(pathEnv, ":") {
-		stack := []string{dir}
+		dirEntries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
 
-		for len(stack) > 0 {
-			currentDir := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-
-			dirEntries, err := os.ReadDir(currentDir)
-			if err != nil {
-				continue
-			}
-
-			for _, dirEntry := range dirEntries {
-				if dirEntry.IsDir() {
-					stack = append(stack, filepath.Join(currentDir, dirEntry.Name()))
-				} else if dirEntry.Name() == commandArg {
-					fmt.Fprintf(outFile, "%s is %s\r\n", commandArg, filepath.Join(currentDir, commandArg))
-					return nil
-				}
+		for _, dirEntry := range dirEntries {
+			if !dirEntry.IsDir() && dirEntry.Name() == commandArg {
+				fmt.Fprintf(outFile, "%s is %s\r\n", commandArg, filepath.Join(dir, commandArg))
+				return nil
 			}
 		}
 	}
