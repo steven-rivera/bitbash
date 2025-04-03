@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"bufio"
@@ -6,17 +6,15 @@ import (
 	"os"
 	"slices"
 	"strings"
-
-	"github.com/steven-rivera/shell/internal/builtin"
 )
 
 const ETX = byte(3) // Ctrl+C (SIGNINT)
 
-func readLine(stdin *bufio.Reader) (string, error) {
+func ReadLine(stdin *bufio.Reader) (string, error) {
 	currentLine := strings.Builder{}
 	prevCharWasTab := false
 
-	fmt.Print(shellPrompt())
+	fmt.Print(ShellPrompt())
 	for {
 		char, err := stdin.ReadByte()
 		if err != nil {
@@ -28,32 +26,32 @@ func readLine(stdin *bufio.Reader) (string, error) {
 			fmt.Print("\r\n")
 			return currentLine.String(), nil
 		case '\t':
-			matches := autoComplete(currentLine.String())
+			matches := AutoComplete(currentLine.String())
 			switch len(matches) {
 			case 0:
 				// no matches, print BELL char
 				fmt.Print("\a")
 			case 1:
-				// move cursor to beginning, erase current line, 
+				// move cursor to beginning, erase current line,
 				// and replace line with match adding a space after
 				fmt.Print("\r\x1b[K")
-				fmt.Printf("%s%s ", shellPrompt(), matches[0])
+				fmt.Printf("%s%s ", ShellPrompt(), matches[0])
 				currentLine.Reset()
 				currentLine.WriteString(fmt.Sprintf("%s ", matches[0]))
 			default:
 				// if TAB pressed twice in sequence, print all matches on new line
 				if prevCharWasTab {
 					fmt.Printf("\r\n%s\r\n", strings.Join(matches, "  "))
-					fmt.Printf("%s%s", shellPrompt(), currentLine.String())
+					fmt.Printf("%s%s", ShellPrompt(), currentLine.String())
 					break
 				}
 
 				// multiple matches, print BELL char
 				fmt.Print("\a")
 				// check for partial completions
-				if lcp := longestCommonPrefix(matches); lcp != currentLine.String() {
+				if lcp := LongestCommonPrefix(matches); lcp != currentLine.String() {
 					fmt.Print("\r\x1b[K")
-					fmt.Printf("%s%s", shellPrompt(), lcp)
+					fmt.Printf("%s%s", ShellPrompt(), lcp)
 					currentLine.Reset()
 					currentLine.WriteString(lcp)
 				}
@@ -70,13 +68,13 @@ func readLine(stdin *bufio.Reader) (string, error) {
 	}
 }
 
-func shellPrompt() string {
+func ShellPrompt() string {
 	return "$ "
 }
 
-func autoComplete(partial string) []string {
+func AutoComplete(partial string) []string {
 	matches := make([]string, 0)
-	for command, _ := range builtin.GetBuiltInCommands() {
+	for command, _ := range GetBuiltInCommands() {
 		if strings.HasPrefix(command, partial) {
 			return append(matches, command)
 		}
@@ -98,35 +96,32 @@ func autoComplete(partial string) []string {
 	return matches
 }
 
-func coalesceQuotes(argStr string) ([]string, error) {
-	if argStr == "" {
-		return []string{}, nil
-	}
+func CoalesceQuotes(argStr string) ([]string, error) {
+	singleQuoteCount := strings.Count(argStr, "'")
+	doubleQuoteCount := strings.Count(argStr, "\"")
 
-	if strings.Count(argStr, "'")%2 != 0 && strings.Count(argStr, "\"")%2 != 0 {
+	if (singleQuoteCount%2 != 0 && doubleQuoteCount == 0) ||
+		(doubleQuoteCount%2 != 0 && singleQuoteCount == 0) {
 		return []string{}, fmt.Errorf("missing closing quote")
 	}
 
-	coalescedArgs := make([]string, 0)
-	currentArg := strings.Builder{}
+	coalescedArgs, currentArg := make([]string, 0), strings.Builder{}
 	inSingleQuotes, inDoubleQuotes := false, false
+
 	for i := 0; i < len(argStr); i++ {
 		char := argStr[i]
-
-		if char == '\'' {
+		switch char {
+		case '\'':
 			if !inDoubleQuotes {
 				inSingleQuotes = !inSingleQuotes
 				continue
 			}
-		}
-		if char == '"' {
+		case '"':
 			if !inSingleQuotes {
 				inDoubleQuotes = !inDoubleQuotes
 				continue
 			}
-		}
-
-		if char == '\\' {
+		case '\\':
 			if !inSingleQuotes && !inDoubleQuotes {
 				if i+1 < len(argStr) {
 					currentArg.WriteByte(argStr[i+1])
@@ -134,7 +129,6 @@ func coalesceQuotes(argStr string) ([]string, error) {
 				}
 				continue
 			}
-
 			if inDoubleQuotes {
 				if i+1 < len(argStr) {
 					switch argStr[i+1] {
@@ -145,16 +139,15 @@ func coalesceQuotes(argStr string) ([]string, error) {
 					}
 				}
 			}
-		}
-
-		if char == ' ' && !inSingleQuotes && !inDoubleQuotes {
-			if currentArg.Len() > 0 {
-				coalescedArgs = append(coalescedArgs, currentArg.String())
-				currentArg.Reset()
+		case ' ':
+			if !inSingleQuotes && !inDoubleQuotes {
+				if currentArg.Len() > 0 {
+					coalescedArgs = append(coalescedArgs, currentArg.String())
+					currentArg.Reset()
+				}
+				continue
 			}
-			continue
 		}
-
 		currentArg.WriteByte(char)
 	}
 
@@ -165,7 +158,7 @@ func coalesceQuotes(argStr string) ([]string, error) {
 	return coalescedArgs, nil
 }
 
-func parseRedirection(args []string) (commandArgs []string, outFile *os.File, errFile *os.File, err error) {
+func ParseRedirection(args []string) (commandArgs []string, outFile *os.File, errFile *os.File, err error) {
 	for index, arg := range args {
 		if arg == ">" || arg == "1>" || arg == "2>" {
 			commandArgs, filePathSlice := args[:index], args[index+1:]
@@ -205,7 +198,7 @@ func parseRedirection(args []string) (commandArgs []string, outFile *os.File, er
 	return args, os.Stdout, os.Stderr, nil
 }
 
-func longestCommonPrefix(strs []string) string {
+func LongestCommonPrefix(strs []string) string {
 	lcp := strings.Builder{}
 	for i := 0; ; i++ {
 		var currChar byte
