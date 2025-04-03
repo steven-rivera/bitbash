@@ -76,7 +76,7 @@ func main() {
 func readLine(stdin *bufio.Reader) (string, error) {
 	fmt.Print("$ ")
 	currentLine := strings.Builder{}
-	multipleMatch := false
+	lastCharTab := false
 	for {
 		char, err := stdin.ReadByte()
 		if err != nil {
@@ -95,13 +95,22 @@ func readLine(stdin *bufio.Reader) (string, error) {
 				fmt.Printf("\r\x1b[0K$ %s ", matches[0])
 				currentLine.Reset()
 				currentLine.WriteString(fmt.Sprintf("%s ", matches[0]))
-			} else if multipleMatch {
-				slices.Sort(matches)
-				fmt.Printf("\r\n%s\r\n", strings.Join(matches, "  "))
-				fmt.Printf("$ %s", currentLine.String())
 			} else {
-				fmt.Print("\a")
-				multipleMatch = true
+				if lastCharTab {
+					fmt.Printf("\r\n%s\r\n", strings.Join(matches, "  "))
+					fmt.Printf("$ %s", currentLine.String())
+				} else {
+					fmt.Print("\a")
+					lcp := longestCommonPrefix(matches)
+					if lcp == currentLine.String() {
+						lastCharTab = true
+					} else {
+						fmt.Printf("\r\x1b[0K$ %s", lcp)
+						currentLine.Reset()
+						currentLine.WriteString(lcp)
+					}
+				}
+
 			}
 			continue
 		}
@@ -111,10 +120,29 @@ func readLine(stdin *bufio.Reader) (string, error) {
 
 		currentLine.WriteByte(char)
 		fmt.Printf("%c", char)
-		multipleMatch = false
+		lastCharTab = false
 
 	}
 	return currentLine.String(), nil
+}
+
+func longestCommonPrefix(strs []string) string {
+	lcp := strings.Builder{}
+	for i := 0; ; i++ {
+		var currChar byte
+		for j, str := range strs {
+			if i >= len(str) {
+				return lcp.String()
+			}
+			if j == 0 {
+				currChar = str[i]
+			}
+			if str[i] != currChar {
+				return lcp.String()
+			}
+		}
+		lcp.WriteByte(currChar)
+	}
 }
 
 func autoComplete(partial string) []string {
@@ -137,7 +165,7 @@ func autoComplete(partial string) []string {
 			}
 		}
 	}
-
+	slices.Sort(matches)
 	return matches
 }
 
