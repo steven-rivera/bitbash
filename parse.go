@@ -10,57 +10,92 @@ import (
 	"github.com/steven-rivera/shell/internal/builtin"
 )
 
+const ETX = byte(3) // Ctrl+C (SIGNINT)
+
 func readLine(stdin *bufio.Reader) (string, error) {
-	fmt.Print("$ ")
 	currentLine := strings.Builder{}
-	lastCharTab := false
+	prevCharWasTab := false
+
+	fmt.Print(shellPrompt())
 	for {
 		char, err := stdin.ReadByte()
 		if err != nil {
-			return "", fmt.Errorf("Error reading input: %w", err)
+			return "", err
 		}
 
-		if char == '\n' || char == '\r' {
+		switch char {
+		case '\n', '\r':
 			fmt.Print("\r\n")
-			break
-		}
-		if char == '\t' {
+			return currentLine.String(), nil
+		case '\t':
 			matches := autoComplete(currentLine.String())
-			if len(matches) == 0 {
+			switch len(matches) {
+			case 0:
+				// no matches, print BELL char
 				fmt.Print("\a")
-			} else if len(matches) == 1 {
-				fmt.Printf("\r\x1b[0K$ %s ", matches[0])
+			case 1:
+				// move cursor to beginning, erase current line, 
+				// and replace line with match adding a space after
+				fmt.Print("\r\x1b[K")
+				fmt.Printf("%s%s ", shellPrompt(), matches[0])
 				currentLine.Reset()
 				currentLine.WriteString(fmt.Sprintf("%s ", matches[0]))
-			} else {
-				if lastCharTab {
+			default:
+				// if TAB pressed twice in sequence, print all matches on new line
+				if prevCharWasTab {
 					fmt.Printf("\r\n%s\r\n", strings.Join(matches, "  "))
-					fmt.Printf("$ %s", currentLine.String())
-				} else {
-					fmt.Print("\a")
-					lcp := longestCommonPrefix(matches)
-					if lcp == currentLine.String() {
-						lastCharTab = true
-					} else {
-						fmt.Printf("\r\x1b[0K$ %s", lcp)
-						currentLine.Reset()
-						currentLine.WriteString(lcp)
-					}
+					fmt.Printf("%s%s", shellPrompt(), currentLine.String())
+					break
 				}
 
+				// multiple matches, print BELL char
+				fmt.Print("\a")
+				// check for partial completions
+				if lcp := longestCommonPrefix(matches); lcp != currentLine.String() {
+					fmt.Print("\r\x1b[K")
+					fmt.Printf("%s%s", shellPrompt(), lcp)
+					currentLine.Reset()
+					currentLine.WriteString(lcp)
+				}
+				prevCharWasTab = true
 			}
+		case ETX:
+			return "", fmt.Errorf("SIGINT")
+
+		default:
+			currentLine.WriteByte(char)
+			fmt.Printf("%c", char)
+			prevCharWasTab = false
+		}
+	}
+}
+
+func shellPrompt() string {
+	return "$ "
+}
+
+func autoComplete(partial string) []string {
+	matches := make([]string, 0)
+	for command, _ := range builtin.GetBuiltInCommands() {
+		if strings.HasPrefix(command, partial) {
+			return append(matches, command)
+		}
+	}
+
+	pathEnv := os.Getenv("PATH")
+	for dir := range strings.SplitSeq(pathEnv, ":") {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
 			continue
 		}
-		if char == 3 {
-			return "", fmt.Errorf("Siginterupt")
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasPrefix(entry.Name(), partial) {
+				matches = append(matches, entry.Name())
+			}
 		}
-
-		currentLine.WriteByte(char)
-		fmt.Printf("%c", char)
-		lastCharTab = false
-
 	}
-	return currentLine.String(), nil
+	slices.Sort(matches)
+	return matches
 }
 
 func coalesceQuotes(argStr string) ([]string, error) {
@@ -187,28 +222,4 @@ func longestCommonPrefix(strs []string) string {
 		}
 		lcp.WriteByte(currChar)
 	}
-}
-
-func autoComplete(partial string) []string {
-	matches := make([]string, 0)
-	for command, _ := range builtin.GetBuiltInCommands() {
-		if strings.HasPrefix(command, partial) {
-			return append(matches, command)
-		}
-	}
-
-	pathEnv := os.Getenv("PATH")
-	for dir := range strings.SplitSeq(pathEnv, ":") {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasPrefix(entry.Name(), partial) {
-				matches = append(matches, entry.Name())
-			}
-		}
-	}
-	slices.Sort(matches)
-	return matches
 }

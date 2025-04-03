@@ -16,7 +16,7 @@ func startREPL() {
 	for {
 		input, err := readLine(stdin)
 		if err != nil {
-			break
+			return
 		}
 		input = strings.TrimSpace(input)
 		splitInput, err := coalesceQuotes(input)
