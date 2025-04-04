@@ -13,9 +13,10 @@ type Command struct {
 	Args        []string
 	Stdout      *os.File
 	Stderr      *os.File
+	Cfg         *config
 }
 
-func NewCommand(input string) (*Command, error) {
+func NewCommand(cfg *config, input string) (*Command, error) {
 	splitInput, err := CoalesceQuotes(input)
 	if err != nil {
 		return nil, err
@@ -33,6 +34,7 @@ func NewCommand(input string) (*Command, error) {
 		Args:        args,
 		Stdout:      outputFile,
 		Stderr:      errFile,
+		Cfg:         cfg,
 	}, nil
 
 }

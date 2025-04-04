@@ -10,7 +10,7 @@ import (
 
 const ETX = byte(3) // Ctrl+C (SIGNINT)
 
-func ReadLine(stdin *bufio.Reader) (string, error) {
+func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 	currentLine := strings.Builder{}
 	prevCharWasTab := false
 

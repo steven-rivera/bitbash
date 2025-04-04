@@ -52,6 +52,8 @@ func HandlerExit(cmd *Command) error {
 	if err != nil {
 		return fmt.Errorf("exit: invalid exit code '%s'\n", cmd.Args[0])
 	}
+	// Must clean up because os.Exit doesn't run defered function
+	cmd.Cfg.CleanUp()
 	os.Exit(exitCode)
 	return nil
 }
