@@ -8,10 +8,11 @@ import (
 	"strings"
 )
 
-const ETX = byte(3) // Ctrl+C (SIGNINT)
+const ETX = byte(3)   // Ctrl+C (SIGNINT)
+const DEL = byte(127) // Backspace
 
 func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
-	currentLine := strings.Builder{}
+	currentLine := []byte{}
 	prevCharWasTab := false
 
 	fmt.Print(ShellPrompt())
@@ -24,9 +25,9 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 		switch char {
 		case '\n', '\r':
 			fmt.Print("\r\n")
-			return currentLine.String(), nil
+			return string(currentLine), nil
 		case '\t':
-			matches := AutoComplete(currentLine.String())
+			matches := AutoComplete(string(currentLine))
 			switch len(matches) {
 			case 0:
 				// no matches, print BELL char
@@ -36,32 +37,36 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 				// and replace line with match adding a space after
 				fmt.Print("\r\x1b[K")
 				fmt.Printf("%s%s ", ShellPrompt(), matches[0])
-				currentLine.Reset()
-				currentLine.WriteString(fmt.Sprintf("%s ", matches[0]))
+				currentLine = []byte(fmt.Sprintf("%s ", matches[0]))
 			default:
 				// if TAB pressed twice in sequence, print all matches on new line
 				if prevCharWasTab {
 					fmt.Printf("\r\n%s\r\n", strings.Join(matches, "  "))
-					fmt.Printf("%s%s", ShellPrompt(), currentLine.String())
+					fmt.Printf("%s%s", ShellPrompt(), string(currentLine))
 					break
 				}
 
 				// multiple matches, print BELL char
 				fmt.Print("\a")
 				// check for partial completions
-				if lcp := LongestCommonPrefix(matches); lcp != currentLine.String() {
+				if lcp := LongestCommonPrefix(matches); lcp != string(currentLine) {
 					fmt.Print("\r\x1b[K")
 					fmt.Printf("%s%s", ShellPrompt(), lcp)
-					currentLine.Reset()
-					currentLine.WriteString(lcp)
+					currentLine = []byte(lcp)
 				}
 				prevCharWasTab = true
 			}
 		case ETX:
 			return "", fmt.Errorf("SIGINT")
+		case DEL:
+			if len(currentLine) != 0 {
+				// Move cursor back, print space, then move back again
+				fmt.Print("\b \b")
+				currentLine = currentLine[:len(currentLine)-1]
+			}
 
 		default:
-			currentLine.WriteByte(char)
+			currentLine = append(currentLine, char)
 			fmt.Printf("%c", char)
 			prevCharWasTab = false
 		}
