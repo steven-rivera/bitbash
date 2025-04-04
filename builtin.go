@@ -1,4 +1,4 @@
-package commands
+package main
 
 import (
 	"fmt"
@@ -21,10 +21,10 @@ func GetBuiltInCommands() map[string]CommandHandler {
 }
 
 func HandlerCd(cmd *Command) error {
-	if len(cmd.args) != 1 {
-		return fmt.Errorf("cd: expected 1 argument got %d", len(cmd.args))
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("cd: expected 1 argument got %d", len(cmd.Args))
 	}
-	dir := cmd.args[0]
+	dir := cmd.Args[0]
 	if dir == "~" {
 		dir, _ = os.UserHomeDir()
 	}
@@ -36,21 +36,21 @@ func HandlerCd(cmd *Command) error {
 }
 
 func HandlerEcho(cmd *Command) error {
-	for _, arg := range cmd.args {
-		fmt.Fprintf(cmd.stdout, "%s ", arg)
+	for _, arg := range cmd.Args {
+		fmt.Fprintf(cmd.Stdout, "%s ", arg)
 	}
-	fmt.Fprint(cmd.stdout, "\r\n")
+	fmt.Fprint(cmd.Stdout, "\r\n")
 	return nil
 }
 
 func HandlerExit(cmd *Command) error {
-	if len(cmd.args) != 1 {
-		return fmt.Errorf("exit: expected 1 argument got %d", len(cmd.args))
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("exit: expected 1 argument got %d", len(cmd.Args))
 	}
 
-	exitCode, err := strconv.Atoi(cmd.args[0])
+	exitCode, err := strconv.Atoi(cmd.Args[0])
 	if err != nil {
-		return fmt.Errorf("exit: invalid exit code '%s'\n", cmd.args[0])
+		return fmt.Errorf("exit: invalid exit code '%s'\n", cmd.Args[0])
 	}
 	os.Exit(exitCode)
 	return nil
@@ -61,17 +61,17 @@ func HandlerPwd(cmd *Command) error {
 	if err != nil {
 		return fmt.Errorf("pwd: %w", err)
 	}
-	fmt.Fprintf(cmd.stdout, "%s\r\n", workingDir)
+	fmt.Fprintf(cmd.Stdout, "%s\r\n", workingDir)
 	return nil
 }
 
 func HandlerType(cmd *Command) error {
-	if len(cmd.args) != 1 {
-		return fmt.Errorf("exit: expected 1 argument got %d", len(cmd.args))
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("exit: expected 1 argument got %d", len(cmd.Args))
 	}
-	commandArg := cmd.args[0]
+	commandArg := cmd.Args[0]
 	if _, ok := GetBuiltInCommands()[commandArg]; ok {
-		fmt.Fprintf(cmd.stdout, "%s is a shell builtin\r\n", commandArg)
+		fmt.Fprintf(cmd.Stdout, "%s is a shell builtin\r\n", commandArg)
 		return nil
 	}
 
@@ -84,7 +84,7 @@ func HandlerType(cmd *Command) error {
 
 		for _, dirEntry := range dirEntries {
 			if !dirEntry.IsDir() && dirEntry.Name() == commandArg {
-				fmt.Fprintf(cmd.stdout, "%s is %s\r\n", commandArg, filepath.Join(dir, commandArg))
+				fmt.Fprintf(cmd.Stdout, "%s is %s\r\n", commandArg, filepath.Join(dir, commandArg))
 				return nil
 			}
 		}

@@ -1,4 +1,4 @@
-package commands
+package main
 
 import (
 	"bytes"
@@ -9,10 +9,10 @@ import (
 )
 
 type Command struct {
-	commandName string
-	args        []string
-	stdout      *os.File
-	stderr      *os.File
+	CommandName string
+	Args        []string
+	Stdout      *os.File
+	Stderr      *os.File
 }
 
 func NewCommand(input string) (*Command, error) {
@@ -29,34 +29,34 @@ func NewCommand(input string) (*Command, error) {
 	}
 
 	return &Command{
-		commandName: command,
-		args:        args,
-		stdout:      outputFile,
-		stderr:      errFile,
+		CommandName: command,
+		Args:        args,
+		Stdout:      outputFile,
+		Stderr:      errFile,
 	}, nil
 
 }
 
 func (c *Command) Exec() error {
-	if handler, ok := GetBuiltInCommands()[c.commandName]; ok {
+	if handler, ok := GetBuiltInCommands()[c.CommandName]; ok {
 		return handler(c)
 	}
 	return HandlerExec(c)
 }
 
 func (c *Command) Close() {
-	if c.stdout != os.Stdout {
-		c.stdout.Close()
+	if c.Stdout != os.Stdout {
+		c.Stdout.Close()
 	}
-	if c.stderr != os.Stderr {
-		c.stdout.Close()
+	if c.Stderr != os.Stderr {
+		c.Stderr.Close()
 	}
 }
 
 func HandlerExec(cmd *Command) error {
-	cmdExec := exec.Command(cmd.commandName, cmd.args...)
+	cmdExec := exec.Command(cmd.CommandName, cmd.Args...)
 	if cmdExec.Err != nil {
-		return fmt.Errorf("%s: command not found", cmd.commandName)
+		return fmt.Errorf("%s: command not found", cmd.CommandName)
 	}
 	//fmt.Printf("Path: '%s', Dir: '%s'\r\n", cmd.Path, cmd.Dir)
 	var stdout bytes.Buffer
@@ -71,10 +71,10 @@ func HandlerExec(cmd *Command) error {
 	// }
 
 	if stdout.Len() != 0 {
-		fmt.Fprint(cmd.stdout, strings.ReplaceAll(stdout.String(), "\n", "\r\n"))
+		fmt.Fprint(cmd.Stdout, strings.ReplaceAll(stdout.String(), "\n", "\r\n"))
 	}
 	if stderr.Len() != 0 {
-		fmt.Fprint(cmd.stderr, strings.ReplaceAll(stderr.String(), "\n", "\r\n"))
+		fmt.Fprint(cmd.Stderr, strings.ReplaceAll(stderr.String(), "\n", "\r\n"))
 	}
 
 	return nil

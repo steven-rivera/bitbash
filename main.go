@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/steven-rivera/shell/internal/commands"
 	"golang.org/x/term"
 )
 
@@ -27,7 +26,7 @@ func startREPL() {
 	stdin := bufio.NewReader(os.Stdin)
 
 	for {
-		input, err := commands.ReadLine(stdin)
+		input, err := ReadLine(stdin)
 		if err != nil {
 			return
 		}
@@ -37,16 +36,17 @@ func startREPL() {
 			continue
 		}
 
-		command, err := commands.NewCommand(trimmedInput)
+		command, err := NewCommand(trimmedInput)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "shell: %s\r\n", err)
 			continue
 		}
-		defer command.Close()
 
 		err = command.Exec()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s\r\n", err)
+			fmt.Fprintf(command.Stderr, "%s\r\n", err)
 		}
+
+		command.Close()
 	}
 }
