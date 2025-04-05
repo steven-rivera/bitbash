@@ -15,7 +15,7 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 	currentLine := []byte{}
 	prevCharWasTab := false
 
-	fmt.Print(ShellPrompt())
+	fmt.Print(ShellPrompt(cfg))
 	for {
 		char, err := stdin.ReadByte()
 		if err != nil {
@@ -36,13 +36,13 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 				// move cursor to beginning, erase current line,
 				// and replace line with match adding a space after
 				fmt.Print("\r\x1b[K")
-				fmt.Printf("%s%s ", ShellPrompt(), matches[0])
+				fmt.Printf("%s%s ", ShellPrompt(cfg), matches[0])
 				currentLine = []byte(fmt.Sprintf("%s ", matches[0]))
 			default:
 				// if TAB pressed twice in sequence, print all matches on new line
 				if prevCharWasTab {
 					fmt.Printf("\r\n%s\r\n", strings.Join(matches, "  "))
-					fmt.Printf("%s%s", ShellPrompt(), string(currentLine))
+					fmt.Printf("%s%s", ShellPrompt(cfg), string(currentLine))
 					break
 				}
 
@@ -51,7 +51,7 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 				// check for partial completions
 				if lcp := LongestCommonPrefix(matches); lcp != string(currentLine) {
 					fmt.Print("\r\x1b[K")
-					fmt.Printf("%s%s", ShellPrompt(), lcp)
+					fmt.Printf("%s%s", ShellPrompt(cfg), lcp)
 					currentLine = []byte(lcp)
 				}
 				prevCharWasTab = true
@@ -73,7 +73,13 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 	}
 }
 
-func ShellPrompt() string {
+func ShellPrompt(cfg *config) string {
+	//if cut, ok := strings.CutPrefix(cfg.currDirectory, cfg.homeDirectory); ok {
+	//	cfg.currDirectory = fmt.Sprintf("~%s", cut)
+	//}
+	//userNameBlueBold := fmt.Sprintf("%s%s%s%s", BLUE, BOLD, cfg.userName, RESET)
+	//currDirGreenBold := fmt.Sprintf("%s%s%s%s", GREEN, BOLD, cfg.currDirectory, RESET)
+	//return fmt.Sprintf("%s:%s\r\n$ ", userNameBlueBold, currDirGreenBold)
 	return "$ "
 }
 

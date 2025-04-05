@@ -13,10 +13,9 @@ type Command struct {
 	Args        []string
 	Stdout      *os.File
 	Stderr      *os.File
-	Cfg         *config
 }
 
-func NewCommand(cfg *config, input string) (*Command, error) {
+func NewCommand(input string) (*Command, error) {
 	splitInput, err := CoalesceQuotes(input)
 	if err != nil {
 		return nil, err
@@ -34,16 +33,15 @@ func NewCommand(cfg *config, input string) (*Command, error) {
 		Args:        args,
 		Stdout:      outputFile,
 		Stderr:      errFile,
-		Cfg:         cfg,
 	}, nil
 
 }
 
-func (c *Command) Exec() error {
+func (c *Command) Exec(cfg *config) error {
 	if handler, ok := GetBuiltInCommands()[c.CommandName]; ok {
-		return handler(c)
+		return handler(c, cfg)
 	}
-	return HandlerExec(c)
+	return HandlerExec(c, cfg)
 }
 
 func (c *Command) Close() {
@@ -55,7 +53,7 @@ func (c *Command) Close() {
 	}
 }
 
-func HandlerExec(cmd *Command) error {
+func HandlerExec(cmd *Command, cfg *config) error {
 	cmdExec := exec.Command(cmd.CommandName, cmd.Args...)
 	if cmdExec.Err != nil {
 		return fmt.Errorf("%s: command not found", cmd.CommandName)

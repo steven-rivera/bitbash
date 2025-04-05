@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-type CommandHandler = func(cmd *Command) error
+type CommandHandler = func(cmd *Command, cfg *config) error
 
 func GetBuiltInCommands() map[string]CommandHandler {
 	return map[string]CommandHandler{
@@ -20,22 +20,23 @@ func GetBuiltInCommands() map[string]CommandHandler {
 	}
 }
 
-func HandlerCd(cmd *Command) error {
+func HandlerCd(cmd *Command, cfg *config) error {
 	if len(cmd.Args) != 1 {
 		return fmt.Errorf("cd: expected 1 argument got %d", len(cmd.Args))
 	}
 	dir := cmd.Args[0]
 	if dir == "~" {
-		dir, _ = os.UserHomeDir()
+		dir = cfg.homeDirectory
 	}
 
 	if err := os.Chdir(dir); err != nil {
 		return fmt.Errorf("cd: %s: No such file or directory", dir)
 	}
+	cfg.currDirectory, _ = os.Getwd()
 	return nil
 }
 
-func HandlerEcho(cmd *Command) error {
+func HandlerEcho(cmd *Command, cfg *config) error {
 	for _, arg := range cmd.Args {
 		fmt.Fprintf(cmd.Stdout, "%s ", arg)
 	}
@@ -43,7 +44,7 @@ func HandlerEcho(cmd *Command) error {
 	return nil
 }
 
-func HandlerExit(cmd *Command) error {
+func HandlerExit(cmd *Command, cfg *config) error {
 	if len(cmd.Args) != 1 {
 		return fmt.Errorf("exit: expected 1 argument got %d", len(cmd.Args))
 	}
@@ -52,13 +53,13 @@ func HandlerExit(cmd *Command) error {
 	if err != nil {
 		return fmt.Errorf("exit: invalid exit code '%s'\n", cmd.Args[0])
 	}
-	// Must clean up because os.Exit doesn't run defered function
-	cmd.Cfg.CleanUp()
+	// Must clean up because os.Exit doesn't run defered functions
+	cfg.CleanUp()
 	os.Exit(exitCode)
 	return nil
 }
 
-func HandlerPwd(cmd *Command) error {
+func HandlerPwd(cmd *Command, cfg *config) error {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("pwd: %w", err)
@@ -67,7 +68,7 @@ func HandlerPwd(cmd *Command) error {
 	return nil
 }
 
-func HandlerType(cmd *Command) error {
+func HandlerType(cmd *Command, cfg *config) error {
 	if len(cmd.Args) != 1 {
 		return fmt.Errorf("exit: expected 1 argument got %d", len(cmd.Args))
 	}

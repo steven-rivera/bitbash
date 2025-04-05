@@ -5,14 +5,18 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/user"
 	"strings"
 
 	"golang.org/x/term"
 )
 
 type config struct {
-	history           []string
+	history          []string
 	oldTerminalState *term.State
+	userName         string
+	currDirectory    string
+	homeDirectory    string
 }
 
 func (cfg *config) CleanUp() {
@@ -26,10 +30,28 @@ func main() {
 	if err != nil {
 		log.Fatalf("shell: %s", err)
 	}
-	
+
+	u, err := user.Current()
+	if err != nil {
+		log.Fatalf("shell: %s", err)
+	}
+
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("shell: %s", err)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("shell: %s", err)
+	}
+
 	cfg := &config{
-		history: make([]string, 0),
+		history:          make([]string, 0),
 		oldTerminalState: oldState,
+		userName:         u.Username,
+		currDirectory:    dir,
+		homeDirectory:    home,
 	}
 	defer cfg.CleanUp()
 
@@ -50,13 +72,13 @@ func startREPL(cfg *config) {
 			continue
 		}
 
-		command, err := NewCommand(cfg, trimmedInput)
+		command, err := NewCommand(trimmedInput)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "shell: %s\r\n", err)
 			continue
 		}
 
-		err = command.Exec()
+		err = command.Exec(cfg)
 		if err != nil {
 			fmt.Fprintf(command.Stderr, "%s\r\n", err)
 		}
