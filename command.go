@@ -16,8 +16,8 @@ type IOStream struct {
 }
 
 type Command struct {
-	CommandName string
-	Args        []string
+	Name string
+	Args []string
 	IOStream
 }
 
@@ -35,16 +35,16 @@ func NewCommand(input string) (*Command, error) {
 	}
 
 	return &Command{
-		CommandName: command,
-		Args:        args,
-		IOStream:    IOStream,
+		Name:     command,
+		Args:     args,
+		IOStream: IOStream,
 	}, nil
 
 }
 
 func (c *Command) Exec(cfg *config) error {
-	if handler, ok := GetBuiltInCommands()[c.CommandName]; ok {
-		return handler(c, cfg)
+	if builtin, ok := GetBuiltInCommands()[c.Name]; ok {
+		return builtin.Handler(c, cfg)
 	}
 	return HandlerExec(c, cfg)
 }
@@ -59,10 +59,10 @@ func (c *Command) Close() {
 }
 
 func HandlerExec(cmd *Command, cfg *config) error {
-	cmdExec := exec.Command(cmd.CommandName, cmd.Args...)
+	cmdExec := exec.Command(cmd.Name, cmd.Args...)
 	// Cmd.Err is non-nil when command is not found in PATH
 	if cmdExec.Err != nil {
-		return fmt.Errorf("%s: command not found", cmd.CommandName)
+		return fmt.Errorf("%s: command not found", cmd.Name)
 	}
 
 	cmdExec.Stdin = cmd.Stdin
@@ -76,7 +76,6 @@ func HandlerExec(cmd *Command, cfg *config) error {
 		return fmt.Errorf("error creating stderr pipe: %w", err)
 	}
 
-	
 	if err := cmdExec.Start(); err != nil {
 		return fmt.Errorf("error starting command: %w", err)
 	}

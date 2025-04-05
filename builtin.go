@@ -8,15 +8,51 @@ import (
 	"strings"
 )
 
-type CommandHandler = func(cmd *Command, cfg *config) error
+type BuiltInCommand struct {
+	Name        string
+	Usage       string
+	Description string
+	Handler     func(cmd *Command, cfg *config) error
+}
 
-func GetBuiltInCommands() map[string]CommandHandler {
-	return map[string]CommandHandler{
-		"exit": HandlerExit,
-		"echo": HandlerEcho,
-		"type": HandlerType,
-		"pwd":  HandlerPwd,
-		"cd":   HandlerCd,
+func GetBuiltInCommands() map[string]BuiltInCommand {
+	return map[string]BuiltInCommand{
+		"exit": BuiltInCommand{
+			Name:        "exit",
+			Usage:       "exit <code>",
+			Description: "cause the shell to exit with provided code",
+			Handler:     HandlerExit,
+		},
+		"echo": BuiltInCommand{
+			Name:        "echo",
+			Usage:       "echo [arg...]",
+			Description: "print all arguments separated by a space to stdout",
+			Handler:     HandlerEcho,
+		},
+		"type": BuiltInCommand{
+			Name:        "type",
+			Usage:       "type <command>",
+			Description: "print whether command is builtin, if not print location of executatable",
+			Handler:     HandlerType,
+		},
+		"pwd": BuiltInCommand{
+			Name:        "pwd",
+			Usage:       "pwd",
+			Description: "print the current working directory",
+			Handler:     HandlerPwd,
+		},
+		"cd": BuiltInCommand{
+			Name:        "cd",
+			Usage:       "cd <directory>",
+			Description: "change the current working directory to the provided directory",
+			Handler:     HandlerCd,
+		},
+		"help": BuiltInCommand{
+			Name:        "help",
+			Usage:       "help",
+			Description: "print this help message",
+			Handler:     HandlerHelp,
+		},
 	}
 }
 
@@ -94,4 +130,14 @@ func HandlerType(cmd *Command, cfg *config) error {
 	}
 
 	return fmt.Errorf("%s: not found", commandArg)
+}
+
+func HandlerHelp(cmd *Command, cfg *config) error {
+	fmt.Fprint(cmd.Stdout, "These BitBash commands are defined internally\r\n\r\n")
+	fmt.Fprint(cmd.Stdout, "Commands:\r\n")
+	for _, builtin := range GetBuiltInCommands() {
+		fmt.Fprintf(cmd.Stdout, "    %s\r\n", builtin.Usage)
+		fmt.Fprintf(cmd.Stdout, "      -%s\r\n\r\n", builtin.Description)
+	}
+	return nil
 }

@@ -59,6 +59,7 @@ func main() {
 }
 
 func startREPL(cfg *config) {
+	// printWelcomeMessage()
 	stdin := bufio.NewReader(os.Stdin)
 
 	for {
@@ -86,4 +87,18 @@ func startREPL(cfg *config) {
 
 		command.Close()
 	}
+}
+
+func printWelcomeMessage() {
+	fmt.Print(GREEN)
+	fmt.Print(`________   ___   _________   ________   ________   ________   ___  ___      `, "\r\n")
+	fmt.Print(`|\   __  \ |\  \ |\___   ___\|\   __  \ |\   __  \ |\   ____\ |\  \|\  \    `, "\r\n")
+	fmt.Print(`\ \  \|\ /_\ \  \\|___ \  \_|\ \  \|\ /_\ \  \|\  \\ \  \___|_\ \  \\\  \   `, "\r\n")
+	fmt.Print(` \ \   __  \\ \  \    \ \  \  \ \   __  \\ \   __  \\ \_____  \\ \   __  \  `, "\r\n")
+	fmt.Print(`  \ \  \|\  \\ \  \    \ \  \  \ \  \|\  \\ \  \ \  \\|____|\  \\ \  \ \  \ `, "\r\n")
+	fmt.Print(`   \ \_______\\ \__\    \ \__\  \ \_______\\ \__\ \__\ ____\_\  \\ \__\ \__\`, "\r\n")
+	fmt.Print(`    \|_______| \|__|     \|__|   \|_______| \|__|\|__||\_________\\|__|\|__|`, "\r\n")
+	fmt.Print(`                                                      \|_________|          `, "\r\n")
+	fmt.Print(RESET)
+	fmt.Print("\r\nWelcome to BitBash! Type help for a list of builtin commands.\r\n\r\n")
 }
