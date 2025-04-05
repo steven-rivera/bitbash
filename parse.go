@@ -224,7 +224,7 @@ func SplitInput(argStr string) ([]string, error) {
 	return coalescedArgs, nil
 }
 
-func ParseRedirection(args []string) ([]string, IOStream, error) {
+func ParseRedirection(parentCmd *Command) error {
 	redirectOperators := map[string]bool{
 		">":   false,
 		"1>":  false,
@@ -236,51 +236,69 @@ func ParseRedirection(args []string) ([]string, IOStream, error) {
 		"&>>": true,
 	}
 
-	commandArgs := []string{}
-	commandIO := IOStream{
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
+	currCmd := parentCmd
+	for currCmd != nil {
+
+		cmdArgs := []string{}
+
+		for i := 0; i < len(currCmd.Args); i++ {
+			token := currCmd.Args[i]
+			appendMode, isRedirOp := redirectOperators[token]
+
+			if !isRedirOp {
+				cmdArgs = append(cmdArgs, token)
+				continue
+			}
+
+			flags := os.O_WRONLY | os.O_CREATE
+			if appendMode {
+				flags |= os.O_APPEND
+			}
+
+			// Make sure oporater is not last argument
+			if i == len(currCmd.Args)-1 {
+				return fmt.Errorf("%s: expected file name", token)
+			}
+
+			switch token {
+			//case "<":
+			//	if currCmd.PipedInto != parentCmd {
+			//		return fmt.Errorf("invalid redirect of stdin when reading from pipe")
+			//	}
+			case ">", "1>", "1>>", ">>":
+				if currCmd.PipedInto != nil {
+					return fmt.Errorf("invalid redirect of stdout when piping")
+				}
+			case "&>", "&>>":
+				if currCmd.PipedInto != nil {
+					return fmt.Errorf("invalid redirect of stdout when piping")
+				}
+			}
+
+			i++
+			filePath := currCmd.Args[i]
+			file, err := os.OpenFile(filePath, flags, 0o666)
+			if err != nil {
+				return fmt.Errorf("%s: %w", token, err)
+			}
+
+			switch token {
+			//case "<":
+			//	currCmd.Stdin = file
+			case ">", "1>", "1>>", ">>":
+				currCmd.Stdout = file
+			case "2>", "2>>":
+				currCmd.Stderr = file
+			case "&>", "&>>":
+				currCmd.Stdout = file
+				currCmd.Stderr = file
+			}
+		}
+
+		currCmd.Args = cmdArgs
+		currCmd = currCmd.PipedInto
 	}
-
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		appendMode, isRedirOp := redirectOperators[arg]
-
-		if !isRedirOp {
-			commandArgs = append(commandArgs, arg)
-			continue
-		}
-
-		flags := os.O_WRONLY | os.O_CREATE
-		if appendMode {
-			flags |= os.O_APPEND
-		}
-
-		// Make sure oporater is not last argument
-		if i == len(args)-1 {
-			return nil, IOStream{}, fmt.Errorf("%s: expected file name", arg)
-		}
-
-		filePath := args[i+1]
-		file, err := os.OpenFile(filePath, flags, 0o666)
-		if err != nil {
-			return nil, IOStream{}, fmt.Errorf("%s: %w", arg, err)
-		}
-
-		switch arg {
-		case ">", "1>", "1>>", ">>":
-			commandIO.Stdout = file
-		case "2>", "2>>":
-			commandIO.Stderr = file
-		case "&>", "&>>":
-			commandIO.Stdout = file
-			commandIO.Stderr = file
-		}
-
-		i++
-	}
-	return commandArgs, commandIO, nil
+	return nil
 }
 
 func LongestCommonPrefix(strs []string) string {
@@ -303,35 +321,52 @@ func LongestCommonPrefix(strs []string) string {
 }
 
 func ParsePipes(splitInput []string) (*Command, error) {
-	parentCommand := &Command{}
-	currCommand := parentCommand
-	commandStrs := []string{}
+	defaultIO := IOStream{
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+	parentCmd := &Command{
+		IOStream: defaultIO,
+	}
+	currCmd := parentCmd
+	tokens := []string{}
 
 	for i := 0; i < len(splitInput); i++ {
 		token := splitInput[i]
 		if token == "|" {
-			if len(commandStrs) == 0 {
+			if len(tokens) == 0 {
 				return nil, fmt.Errorf("No command provided to write side of pipe")
 			}
-			currCommand.Name = commandStrs[0]
-			currCommand.Args = commandStrs[1:]
-			currCommand.PipedInto = &Command{}
-			currCommand = currCommand.PipedInto
+			currCmd.Name, currCmd.Args = tokens[0], tokens[1:]
+			currCmd.PipedInto = &Command{
+				IOStream: defaultIO,
+			}
+			currCmd = currCmd.PipedInto
 
-			commandStrs = []string{}
+			tokens = []string{}
 			continue
 		}
 
-		commandStrs = append(commandStrs, token)
+		tokens = append(tokens, token)
 	}
 
-	if len(commandStrs) == 0 {
+	if len(tokens) == 0 {
 		return nil, fmt.Errorf("No command provided to read side of pipe")
 	}
+	currCmd.Name, currCmd.Args = tokens[0], tokens[1:]
+	currCmd.PipedInto = nil
 
-	currCommand.Name = commandStrs[0]
-	currCommand.Args = commandStrs[1:]
-	currCommand.PipedInto = nil
+	// Create pipes and connect them to commands respective io fields
+	currCmd = parentCmd
+	for currCmd.PipedInto != nil {
+		r, w, err := os.Pipe()
+		if err != nil {
+			return nil, fmt.Errorf("Error creating pipe: %w", err)
+		}
+		currCmd.Stdout, currCmd.PipedInto.Stdin = w, r
+		currCmd = currCmd.PipedInto
+	}
 
-	return parentCommand, nil
+	return parentCmd, nil
 }

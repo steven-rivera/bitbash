@@ -22,8 +22,8 @@ type Command struct {
 	PipedInto *Command
 }
 
-func NewCommand(input string) (*Command, error) {
-	splitInput, err := SplitInput(input)
+func NewCommand(rawInput string) (*Command, error) {
+	splitInput, err := SplitInput(rawInput)
 	if err != nil {
 		return nil, err
 	}
@@ -33,41 +33,12 @@ func NewCommand(input string) (*Command, error) {
 		return nil, err
 	}
 
-	currCmd := command
-	for currCmd != nil {
-		args, IOStream, err := ParseRedirection(currCmd.Args)
-		if err != nil {
-			return nil, err
-		}
-		currCmd.Args = args
-		currCmd.IOStream = IOStream
-		currCmd = currCmd.PipedInto
+	err = ParseRedirection(command)
+	if err != nil {
+		return nil, err
 	}
-
-	currCmd = command
-	for currCmd.PipedInto != nil {
-		r, w, err := os.Pipe()
-		if err != nil {
-			return nil, err
-		}
-
-		currCmd.Stdout = w
-		currCmd.PipedInto.Stdin = r
-		currCmd = currCmd.PipedInto
-	}
-
-	// currCmd = command
-	// for currCmd != nil {
-	// 	fmt.Printf("Name:   %#v\r\n", currCmd.Name)
-	// 	fmt.Printf("Args:   %#v\r\n", currCmd.Args)
-	// 	fmt.Printf("Stdin:  %#v\r\n", currCmd.Stdin)
-	// 	fmt.Printf("Stdout: %#v\r\n", currCmd.Stdout)
-	// 	fmt.Printf("Stderr: %#v\r\n\r\n", currCmd.Stderr)
-	// 	currCmd = currCmd.PipedInto
-	// }
 
 	return command, nil
-
 }
 
 func (c *Command) Exec(cfg *config) {
