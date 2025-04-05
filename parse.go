@@ -167,14 +167,6 @@ func AutoComplete(partial string) []string {
 }
 
 func SplitInput(argStr string) ([]string, error) {
-	singleQuoteCount := strings.Count(argStr, "'")
-	doubleQuoteCount := strings.Count(argStr, "\"")
-
-	if (singleQuoteCount%2 != 0 && doubleQuoteCount == 0) ||
-		(doubleQuoteCount%2 != 0 && singleQuoteCount == 0) {
-		return []string{}, fmt.Errorf("missing closing quote")
-	}
-
 	coalescedArgs, currentArg := make([]string, 0), strings.Builder{}
 	inSingleQuotes, inDoubleQuotes := false, false
 
@@ -223,6 +215,10 @@ func SplitInput(argStr string) ([]string, error) {
 
 	if currentArg.Len() > 0 {
 		coalescedArgs = append(coalescedArgs, currentArg.String())
+	}
+
+	if inDoubleQuotes || inSingleQuotes {
+		return []string{}, fmt.Errorf("missing closing quote")
 	}
 
 	return coalescedArgs, nil
