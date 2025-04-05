@@ -166,7 +166,7 @@ func AutoComplete(partial string) []string {
 	return matches
 }
 
-func CoalesceQuotes(argStr string) ([]string, error) {
+func SplitInput(argStr string) ([]string, error) {
 	singleQuoteCount := strings.Count(argStr, "'")
 	doubleQuoteCount := strings.Count(argStr, "\"")
 

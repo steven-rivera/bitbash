@@ -22,7 +22,7 @@ type Command struct {
 }
 
 func NewCommand(input string) (*Command, error) {
-	splitInput, err := CoalesceQuotes(input)
+	splitInput, err := SplitInput(input)
 	if err != nil {
 		return nil, err
 	}
