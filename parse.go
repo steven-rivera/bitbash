@@ -301,3 +301,37 @@ func LongestCommonPrefix(strs []string) string {
 		lcp.WriteByte(currChar)
 	}
 }
+
+func ParsePipes(splitInput []string) (*Command, error) {
+	parentCommand := &Command{}
+	currCommand := parentCommand
+	commandStrs := []string{}
+
+	for i := 0; i < len(splitInput); i++ {
+		token := splitInput[i]
+		if token == "|" {
+			if len(commandStrs) == 0 {
+				return nil, fmt.Errorf("No command provided to write side of pipe")
+			}
+			currCommand.Name = commandStrs[0]
+			currCommand.Args = commandStrs[1:]
+			currCommand.PipedInto = &Command{}
+			currCommand = currCommand.PipedInto
+
+			commandStrs = []string{}
+			continue
+		}
+
+		commandStrs = append(commandStrs, token)
+	}
+
+	if len(commandStrs) == 0 {
+		return nil, fmt.Errorf("No command provided to read side of pipe")
+	}
+
+	currCommand.Name = commandStrs[0]
+	currCommand.Args = commandStrs[1:]
+	currCommand.PipedInto = nil
+
+	return parentCommand, nil
+}

@@ -12,7 +12,7 @@ type BuiltInCommand struct {
 	Name        string
 	Usage       string
 	Description string
-	Handler     func(cmd *Command, cfg *config) error
+	Handler     func(cmd *Command, cfg *config)
 }
 
 func GetBuiltInCommands() map[string]BuiltInCommand {
@@ -56,9 +56,11 @@ func GetBuiltInCommands() map[string]BuiltInCommand {
 	}
 }
 
-func HandlerCd(cmd *Command, cfg *config) error {
+func HandlerCd(cmd *Command, cfg *config) {
+	defer cfg.running.Done()
+	defer cmd.Close()
 	if len(cmd.Args) != 1 {
-		return fmt.Errorf("cd: expected 1 argument got %d", len(cmd.Args))
+		fmt.Fprintf(cmd.Stderr, "cd: expected 1 argument got %d\r\n", len(cmd.Args))
 	}
 	dir := cmd.Args[0]
 	if dir == "~" {
@@ -66,52 +68,57 @@ func HandlerCd(cmd *Command, cfg *config) error {
 	}
 
 	if err := os.Chdir(dir); err != nil {
-		return fmt.Errorf("cd: %s: No such file or directory", dir)
+		fmt.Fprintf(cmd.Stderr, "cd: %s: No such file or directory\r\n", dir)
 	}
 	cfg.currDirectory, _ = os.Getwd()
-	return nil
 }
 
-func HandlerEcho(cmd *Command, cfg *config) error {
+func HandlerEcho(cmd *Command, cfg *config) {
+	defer cfg.running.Done()
+	defer cmd.Close()
 	for _, arg := range cmd.Args {
 		fmt.Fprintf(cmd.Stdout, "%s ", arg)
 	}
 	fmt.Fprint(cmd.Stdout, "\r\n")
-	return nil
 }
 
-func HandlerExit(cmd *Command, cfg *config) error {
+func HandlerExit(cmd *Command, cfg *config) {
+	defer cfg.running.Done()
+	defer cmd.Close()
 	if len(cmd.Args) != 1 {
-		return fmt.Errorf("exit: expected 1 argument got %d", len(cmd.Args))
+		fmt.Fprintf(cmd.Stderr, "exit: expected 1 argument got %d\r\n", len(cmd.Args))
 	}
 
 	exitCode, err := strconv.Atoi(cmd.Args[0])
 	if err != nil {
-		return fmt.Errorf("exit: invalid exit code '%s'\n", cmd.Args[0])
+		fmt.Fprintf(cmd.Stderr, "exit: invalid exit code '%s'\r\n", cmd.Args[0])
 	}
-	// Must clean up because os.Exit doesn't run defered functions
+
+	// Call because os.Exit won't run defered call
 	cfg.CleanUp()
 	os.Exit(exitCode)
-	return nil
 }
 
-func HandlerPwd(cmd *Command, cfg *config) error {
+func HandlerPwd(cmd *Command, cfg *config) {
+	defer cfg.running.Done()
+	defer cmd.Close()
 	workingDir, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("pwd: %w", err)
+		fmt.Fprintf(cmd.Stderr, "pwd: %s\r\n", err)
 	}
 	fmt.Fprintf(cmd.Stdout, "%s\r\n", workingDir)
-	return nil
 }
 
-func HandlerType(cmd *Command, cfg *config) error {
+func HandlerType(cmd *Command, cfg *config) {
+	defer cfg.running.Done()
+	defer cmd.Close()
 	if len(cmd.Args) != 1 {
-		return fmt.Errorf("exit: expected 1 argument got %d", len(cmd.Args))
+		fmt.Fprintf(cmd.Stderr, "exit: expected 1 argument got %d\r\n", len(cmd.Args))
 	}
 	commandArg := cmd.Args[0]
 	if _, ok := GetBuiltInCommands()[commandArg]; ok {
 		fmt.Fprintf(cmd.Stdout, "%s is a shell builtin\r\n", commandArg)
-		return nil
+		return
 	}
 
 	pathEnv := os.Getenv("PATH")
@@ -124,20 +131,21 @@ func HandlerType(cmd *Command, cfg *config) error {
 		for _, dirEntry := range dirEntries {
 			if !dirEntry.IsDir() && dirEntry.Name() == commandArg {
 				fmt.Fprintf(cmd.Stdout, "%s is %s\r\n", commandArg, filepath.Join(dir, commandArg))
-				return nil
+				return 
 			}
 		}
 	}
 
-	return fmt.Errorf("%s: not found", commandArg)
+	fmt.Fprintf(cmd.Stderr, "%s: not found\r\n", commandArg)
 }
 
-func HandlerHelp(cmd *Command, cfg *config) error {
+func HandlerHelp(cmd *Command, cfg *config) {
+	defer cfg.running.Done()
+	defer cmd.Close()
 	fmt.Fprint(cmd.Stdout, "These BitBash commands are defined internally\r\n\r\n")
 	fmt.Fprint(cmd.Stdout, "Commands:\r\n")
 	for _, builtin := range GetBuiltInCommands() {
 		fmt.Fprintf(cmd.Stdout, "    %s\r\n", builtin.Usage)
 		fmt.Fprintf(cmd.Stdout, "      -%s\r\n\r\n", builtin.Description)
 	}
-	return nil
 }

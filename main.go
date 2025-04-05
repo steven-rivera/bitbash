@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"strings"
+	"sync"
 
 	"golang.org/x/term"
 )
@@ -17,6 +18,7 @@ type config struct {
 	userName         string
 	currDirectory    string
 	homeDirectory    string
+	running          *sync.WaitGroup
 }
 
 func (cfg *config) CleanUp() {
@@ -52,10 +54,11 @@ func main() {
 		userName:         u.Username,
 		currDirectory:    dir,
 		homeDirectory:    home,
+		running:          &sync.WaitGroup{},
 	}
 	defer cfg.CleanUp()
 
-	//printWelcomeMessage()
+	// printWelcomeMessage()
 	startREPL(cfg)
 }
 
@@ -80,12 +83,7 @@ func startREPL(cfg *config) {
 			continue
 		}
 
-		err = command.Exec(cfg)
-		if err != nil {
-			fmt.Fprintf(command.Stderr, "%s\r\n", err)
-		}
-
-		command.Close()
+		command.Exec(cfg)
 	}
 }
 
