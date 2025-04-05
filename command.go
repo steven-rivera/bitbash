@@ -1,11 +1,12 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
-	"strings"
+	"sync"
 )
 
 type IOStream struct {
@@ -59,27 +60,44 @@ func (c *Command) Close() {
 
 func HandlerExec(cmd *Command, cfg *config) error {
 	cmdExec := exec.Command(cmd.CommandName, cmd.Args...)
+	// Cmd.Err is non-nil when command is not found in PATH
 	if cmdExec.Err != nil {
 		return fmt.Errorf("%s: command not found", cmd.CommandName)
 	}
-	//fmt.Printf("Path: '%s', Dir: '%s'\r\n", cmd.Path, cmd.Dir)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmdExec.Stdin = os.Stdin
-	cmdExec.Stdout = &stdout
-	cmdExec.Stderr = &stderr
 
-	cmdExec.Run()
-	// if err != nil {
-	// 	return fmt.Errorf("error: %s", err)
-	// }
+	cmdExec.Stdin = cmd.Stdin
 
-	if stdout.Len() != 0 {
-		fmt.Fprint(cmd.Stdout, strings.ReplaceAll(stdout.String(), "\n", "\r\n"))
+	stdoutPipe, err := cmdExec.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("error creating stdout pipe: %w", err)
 	}
-	if stderr.Len() != 0 {
-		fmt.Fprint(cmd.Stderr, strings.ReplaceAll(stderr.String(), "\n", "\r\n"))
+	stderrPipe, err := cmdExec.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("error creating stderr pipe: %w", err)
 	}
 
+	
+	if err := cmdExec.Start(); err != nil {
+		return fmt.Errorf("error starting command: %w", err)
+	}
+
+	// Handle stdout and stderr conversion in separate goroutines
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+	go processOutput(wg, stdoutPipe, cmd.Stdout)
+	go processOutput(wg, stderrPipe, cmd.Stderr)
+	wg.Wait()
+
+	cmdExec.Wait()
 	return nil
+}
+
+// Raw mode requires replacing "\n" with "\r\n" so output is display correctly
+func processOutput(wg *sync.WaitGroup, output io.Reader, writer io.Writer) {
+	scanner := bufio.NewScanner(output)
+	for scanner.Scan() {
+		line := scanner.Text()
+		fmt.Fprint(writer, line+"\r\n")
+	}
+	wg.Done()
 }
