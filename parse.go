@@ -66,8 +66,9 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 					fmt.Printf("%s%s", ShellPrompt(cfg), lcp)
 					currentLine = []byte(lcp)
 				}
-				prevCharWasTab = true
 			}
+			prevCharWasTab = true
+			continue
 		case ETX:
 			return "", fmt.Errorf("SIGINT")
 		case DEL:
@@ -83,14 +84,14 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 				currentLine = append(currentLine, ESC, char)
 				fmt.Printf("%c%c", ESC, char)
 				prevCharWasTab = false
-				continue
+				break
 			}
 			char, _ = stdin.ReadByte()
 			switch char {
 			case CURSOR_UP:
 				if len(cfg.history) == 0 {
 					fmt.Print("\a")
-					continue
+					break
 				}
 
 				if currHistoryIndex == -1 {
@@ -108,7 +109,7 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 			case CURSOR_DOWN:
 				if currHistoryIndex == -1 {
 					fmt.Print("\a")
-					continue
+					break
 				}
 
 				if currHistoryIndex < len(cfg.history)-1 {
@@ -125,8 +126,9 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 		default:
 			currentLine = append(currentLine, char)
 			fmt.Printf("%c", char)
-			prevCharWasTab = false
+
 		}
+		prevCharWasTab = false
 	}
 }
 

@@ -55,11 +55,11 @@ func main() {
 	}
 	defer cfg.CleanUp()
 
+	//printWelcomeMessage()
 	startREPL(cfg)
 }
 
 func startREPL(cfg *config) {
-	// printWelcomeMessage()
 	stdin := bufio.NewReader(os.Stdin)
 
 	for {
