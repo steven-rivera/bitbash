@@ -8,11 +8,23 @@ import (
 	"strings"
 )
 
-const ETX = byte(3)   // Ctrl+C (SIGNINT)
-const DEL = byte(127) // Backspace
+const (
+	ETX = byte(3)   // Ctrl+C (SIGNINT)
+	DEL = byte(127) // Backspace
+	ESC = byte(27)  // ESC
+)
+
+const (
+	CURSOR_UP      = byte('A')
+	CURSOR_DOWN    = byte('B')
+	CURSOR_FORWARD = byte('C')
+	CURSOR_BACK    = byte('D')
+)
 
 func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 	currentLine := []byte{}
+	prevCurrentLine := []byte{}
+	currHistoryIndex := -1
 	prevCharWasTab := false
 
 	fmt.Print(ShellPrompt(cfg))
@@ -63,6 +75,51 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 				// Move cursor back, print space, then move back again
 				fmt.Print("\b \b")
 				currentLine = currentLine[:len(currentLine)-1]
+			}
+		case ESC:
+			char, _ := stdin.ReadByte()
+			// Check if a Control Sequence Introducer
+			if char != '[' {
+				currentLine = append(currentLine, ESC, char)
+				fmt.Printf("%c%c", ESC, char)
+				prevCharWasTab = false
+				continue
+			}
+			char, _ = stdin.ReadByte()
+			switch char {
+			case CURSOR_UP:
+				if len(cfg.history) == 0 {
+					fmt.Print("\a")
+					continue
+				}
+
+				if currHistoryIndex == -1 {
+					currHistoryIndex = len(cfg.history)
+				}
+
+				if currHistoryIndex > 0 {
+					currHistoryIndex--
+					currentLine = []byte(cfg.history[currHistoryIndex])
+					fmt.Printf("\r\x1b[K%s%s", ShellPrompt(cfg), currentLine)
+				} else {
+					fmt.Print("\a")
+				}
+
+			case CURSOR_DOWN:
+				if currHistoryIndex == -1 {
+					fmt.Print("\a")
+					continue
+				}
+
+				if currHistoryIndex < len(cfg.history)-1 {
+					currHistoryIndex++
+					currentLine = []byte(cfg.history[currHistoryIndex])
+					fmt.Printf("\r\x1b[K%s%s", ShellPrompt(cfg), currentLine)
+				} else {
+					currentLine = prevCurrentLine
+					fmt.Printf("\r\x1b[K%s%s", ShellPrompt(cfg), currentLine)
+					currHistoryIndex = -1
+				}
 			}
 
 		default:

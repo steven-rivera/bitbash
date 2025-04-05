@@ -71,6 +71,7 @@ func startREPL(cfg *config) {
 		if len(trimmedInput) == 0 {
 			continue
 		}
+		cfg.history = append(cfg.history, trimmedInput)
 
 		command, err := NewCommand(trimmedInput)
 		if err != nil {
