@@ -226,6 +226,7 @@ func SplitInput(argStr string) ([]string, error) {
 
 func ParseRedirection(parentCmd *Command) error {
 	redirectOperators := map[string]bool{
+		"<":   false,
 		">":   false,
 		"1>":  false,
 		"2>":  false,
@@ -250,7 +251,7 @@ func ParseRedirection(parentCmd *Command) error {
 				continue
 			}
 
-			flags := os.O_WRONLY | os.O_CREATE
+			flags := os.O_RDWR | os.O_CREATE
 			if appendMode {
 				flags |= os.O_APPEND
 			}
@@ -261,10 +262,10 @@ func ParseRedirection(parentCmd *Command) error {
 			}
 
 			switch token {
-			//case "<":
-			//	if currCmd.PipedInto != parentCmd {
-			//		return fmt.Errorf("invalid redirect of stdin when reading from pipe")
-			//	}
+			case "<":
+				if currCmd != parentCmd {
+					return fmt.Errorf("invalid redirect of stdin when reading from pipe")
+				}
 			case ">", "1>", "1>>", ">>":
 				if currCmd.PipedInto != nil {
 					return fmt.Errorf("invalid redirect of stdout when piping")
@@ -283,8 +284,8 @@ func ParseRedirection(parentCmd *Command) error {
 			}
 
 			switch token {
-			//case "<":
-			//	currCmd.Stdin = file
+			case "<":
+				currCmd.Stdin = file
 			case ">", "1>", "1>>", ">>":
 				currCmd.Stdout = file
 			case "2>", "2>>":
@@ -357,7 +358,7 @@ func ParsePipes(splitInput []string) (*Command, error) {
 	currCmd.Name, currCmd.Args = tokens[0], tokens[1:]
 	currCmd.PipedInto = nil
 
-	// Create pipes and connect them to commands respective io fields
+	// Create pipes and connect them to each subcommand
 	currCmd = parentCmd
 	for currCmd.PipedInto != nil {
 		r, w, err := os.Pipe()
