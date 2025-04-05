@@ -8,11 +8,16 @@ import (
 	"strings"
 )
 
+type IOStream struct {
+	Stdin  *os.File
+	Stdout *os.File
+	Stderr *os.File
+}
+
 type Command struct {
 	CommandName string
 	Args        []string
-	Stdout      *os.File
-	Stderr      *os.File
+	IOStream
 }
 
 func NewCommand(input string) (*Command, error) {
@@ -23,7 +28,7 @@ func NewCommand(input string) (*Command, error) {
 
 	command, args := splitInput[0], splitInput[1:]
 
-	args, outputFile, errFile, err := ParseRedirection(args)
+	args, IOStream, err := ParseRedirection(args)
 	if err != nil {
 		return nil, err
 	}
@@ -31,8 +36,7 @@ func NewCommand(input string) (*Command, error) {
 	return &Command{
 		CommandName: command,
 		Args:        args,
-		Stdout:      outputFile,
-		Stderr:      errFile,
+		IOStream:    IOStream,
 	}, nil
 
 }

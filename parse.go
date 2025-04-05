@@ -169,44 +169,63 @@ func CoalesceQuotes(argStr string) ([]string, error) {
 	return coalescedArgs, nil
 }
 
-func ParseRedirection(args []string) (commandArgs []string, outFile *os.File, errFile *os.File, err error) {
-	for index, arg := range args {
-		if arg == ">" || arg == "1>" || arg == "2>" {
-			commandArgs, filePathSlice := args[:index], args[index+1:]
-			if len(filePathSlice) != 1 {
-				return nil, nil, nil, fmt.Errorf("%s: expected 1 argument got %d", arg, len(filePathSlice))
-			}
-			file, err := os.Create(filePathSlice[0])
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("%s: %w", arg, err)
-			}
-
-			switch arg {
-			case "2>":
-				return commandArgs, os.Stdout, file, nil
-			default:
-				return commandArgs, file, os.Stderr, nil
-			}
-		}
-		if arg == ">>" || arg == "1>>" || arg == "2>>" {
-			commandArgs, filePathSlice := args[:index], args[index+1:]
-			if len(filePathSlice) != 1 {
-				return nil, nil, nil, fmt.Errorf("%s: expected 1 argument got %d", arg, len(filePathSlice))
-			}
-			file, err := os.OpenFile(filePathSlice[0], os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o666)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("%s: %w", arg, err)
-			}
-
-			switch arg {
-			case "2>>":
-				return commandArgs, os.Stdout, file, nil
-			default:
-				return commandArgs, file, os.Stderr, nil
-			}
-		}
+func ParseRedirection(args []string) ([]string, IOStream, error) {
+	redirectOperators := map[string]bool{
+		">":   false,
+		"1>":  false,
+		"2>":  false,
+		"&>":  false,
+		">>":  true,
+		"1>>": true,
+		"2>>": true,
+		"&>>": true,
 	}
-	return args, os.Stdout, os.Stderr, nil
+
+	commandArgs := []string{}
+	commandIO := IOStream{
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		appendMode, isRedirOp := redirectOperators[arg]
+
+		if !isRedirOp {
+			commandArgs = append(commandArgs, arg)
+			continue
+		}
+
+		flags := os.O_WRONLY | os.O_CREATE
+		if appendMode {
+			flags |= os.O_APPEND
+		}
+
+		// Make sure oporater is not last argument
+		if i == len(args)-1 {
+			return nil, IOStream{}, fmt.Errorf("%s: expected file name", arg)
+		}
+
+		filePath := args[i+1]
+		file, err := os.OpenFile(filePath, flags, 0o666)
+		if err != nil {
+			return nil, IOStream{}, fmt.Errorf("%s: %w", arg, err)
+		}
+
+		switch arg {
+		case ">", "1>", "1>>", ">>":
+			commandIO.Stdout = file
+		case "2>", "2>>":
+			commandIO.Stderr = file
+		case "&>", "&>>":
+			commandIO.Stdout = file
+			commandIO.Stderr = file
+		}
+
+		i++
+	}
+	return commandArgs, commandIO, nil
 }
 
 func LongestCommonPrefix(strs []string) string {
