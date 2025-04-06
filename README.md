@@ -4,9 +4,9 @@
 
 ![logo](images/ascii-art.png)
 
----
+<br>
 
-## Features
+## ✨ Features
 
 ### Redirection
 
@@ -38,7 +38,7 @@
 
 Type `help` at the prompt to list all built-in commands and available features.
 
----
+<br>
 
 ## 🛠 Installation
 
