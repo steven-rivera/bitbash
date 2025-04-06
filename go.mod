@@ -1,4 +1,4 @@
-module github.com/steven-rivera/shell
+module github.com/steven-rivera/bitbash
 
 go 1.24.0
 
