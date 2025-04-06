@@ -58,7 +58,7 @@ func main() {
 	}
 	defer cfg.CleanUp()
 
-	// printWelcomeMessage()
+	printWelcomeMessage()
 	startREPL(cfg)
 }
 
@@ -68,6 +68,7 @@ func startREPL(cfg *config) {
 	for {
 		input, err := ReadLine(cfg, stdin)
 		if err != nil {
+			fmt.Print("\r\n")
 			return
 		}
 
@@ -98,5 +99,29 @@ func printWelcomeMessage() {
 	fmt.Print(`    \|_______| \|__|     \|__|   \|_______| \|__|\|__||\_________\\|__|\|__|`, "\r\n")
 	fmt.Print(`                                                      \|_________|          `, "\r\n")
 	fmt.Print(RESET)
-	fmt.Print("\r\nWelcome to BitBash! Type help for a list of builtin commands.\r\n\r\n")
+
+	fmt.Print("\r\nWelcome to BitBash! Here is a list of supported features:\r\n\r\n")
+
+	fmt.Print("Redirection:\r\n")
+	fmt.Print("    <            Redirect stdin from file\r\n")
+	fmt.Print("    >  >>        Redirect stdout to file\r\n")
+	fmt.Print("    2>  2>>      Redirect stderr to file\r\n")
+	fmt.Print("    &>  &>>      Redirect stderr to file\r\n")
+	fmt.Print("\r\n")
+	fmt.Print("Piping:\r\n")
+	fmt.Print("    |            Redirect the stdout of one command to the stdin of another\r\n")
+	fmt.Print("\r\n")
+	fmt.Print("Autocomplete:\r\n")
+	fmt.Print("    TAB          Attempt to complete or partially complete the name of the commnd\r\n")
+	fmt.Print("    TAB TAB      If multiple autocomplete matches print them all\r\n")
+	fmt.Print("\r\n")
+	fmt.Print("Quoting:\r\n")
+	fmt.Print("    '            Characters quoted in single quotes preserve their literal value\r\n")
+	fmt.Print(`    "            Same as single quotes but processes the escape sequences \\, \$, and \"`, "\r\n")
+	fmt.Print("Command History:\r\n")
+	fmt.Print("\r\n")
+	fmt.Print("    Up Arrow     Replace current line with previous command in history\r\n")
+	fmt.Print("    Down Arrow   Replace current line with next command in history\r\n")
+
+	fmt.Print("\r\nType help for a list of builtin commands.\r\n")
 }

@@ -133,13 +133,13 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 }
 
 func ShellPrompt(cfg *config) string {
-	//if cut, ok := strings.CutPrefix(cfg.currDirectory, cfg.homeDirectory); ok {
-	//	cfg.currDirectory = fmt.Sprintf("~%s", cut)
-	//}
-	//userNameBlueBold := fmt.Sprintf("%s%s%s%s", BLUE, BOLD, cfg.userName, RESET)
-	//currDirGreenBold := fmt.Sprintf("%s%s%s%s", GREEN, BOLD, cfg.currDirectory, RESET)
-	//return fmt.Sprintf("%s:%s\r\n$ ", userNameBlueBold, currDirGreenBold)
-	return "$ "
+	if cut, ok := strings.CutPrefix(cfg.currDirectory, cfg.homeDirectory); ok {
+		cfg.currDirectory = fmt.Sprintf("~%s", cut)
+	}
+	userNameBlueBold := fmt.Sprintf("%s%s%s%s", BLUE, BOLD, cfg.userName, RESET)
+	currDirGreenBold := fmt.Sprintf("%s%s%s%s", GREEN, BOLD, cfg.currDirectory, RESET)
+	return fmt.Sprintf("%s:%s $ ", userNameBlueBold, currDirGreenBold)
+	//return "$ "
 }
 
 func AutoComplete(partial string) []string {
