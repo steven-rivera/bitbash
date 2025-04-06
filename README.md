@@ -4,8 +4,6 @@
 
 ![logo](images/ascii-art.png)
 
-<br>
-
 ## ✨ Features
 
 ### Redirection
