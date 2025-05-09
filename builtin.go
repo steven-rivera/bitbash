@@ -76,10 +76,13 @@ func HandlerCd(cmd *Command, cfg *config) {
 func HandlerEcho(cmd *Command, cfg *config) {
 	defer cfg.running.Done()
 	defer cmd.Close()
-	for _, arg := range cmd.Args {
-		fmt.Fprintf(cmd.Stdout, "%s ", arg)
+
+	fmt.Fprint(cmd.Stdout, strings.Join(cmd.Args, " "))
+	if cmd.Stdout == os.Stdout {
+		fmt.Fprint(cmd.Stdout, "\r\n")
+	} else {
+		fmt.Fprint(cmd.Stdout, "\n")
 	}
-	fmt.Fprint(cmd.Stdout, "\r\n")
 }
 
 func HandlerExit(cmd *Command, cfg *config) {
@@ -131,7 +134,7 @@ func HandlerType(cmd *Command, cfg *config) {
 		for _, dirEntry := range dirEntries {
 			if !dirEntry.IsDir() && dirEntry.Name() == commandArg {
 				fmt.Fprintf(cmd.Stdout, "%s is %s\r\n", commandArg, filepath.Join(dir, commandArg))
-				return 
+				return
 			}
 		}
 	}
