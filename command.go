@@ -108,12 +108,21 @@ func HandlerExec(cmd *Command, cfg *config) {
 	cmdExec.Wait()
 }
 
-// Raw mode requires replacing "\n" with "\r\n" so output is displayed correctly
+// Raw mode requires replacing "\n" with "\r\n" when outputting to terminal.
+// If not text will be printed on a new line but at column of the previous
+// line instead of column 0.
 func interceptOutput(wg *sync.WaitGroup, output io.Reader, writer io.Writer) {
-	scanner := bufio.NewScanner(output)
-	for scanner.Scan() {
-		line := scanner.Text()
-		fmt.Fprint(writer, line+"\r\n")
+	reader := bufio.NewReader(output)
+	for {
+		b, err := reader.ReadByte()
+		if err != nil {
+			break
+		}
+		if b == '\n' && (writer == os.Stdout || writer == os.Stderr) {
+			fmt.Fprint(writer, "\r\n")
+		} else {
+			fmt.Fprint(writer, string(b))
+		}
 	}
 	wg.Done()
 }
