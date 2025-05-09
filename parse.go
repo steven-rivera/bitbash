@@ -254,6 +254,8 @@ func ParseRedirection(parentCmd *Command) error {
 			flags := os.O_RDWR | os.O_CREATE
 			if appendMode {
 				flags |= os.O_APPEND
+			} else {
+				flags |= os.O_TRUNC
 			}
 
 			// Make sure oporater is not last argument
@@ -266,11 +268,7 @@ func ParseRedirection(parentCmd *Command) error {
 				if currCmd != parentCmd {
 					return fmt.Errorf("invalid redirect of stdin when reading from pipe")
 				}
-			case ">", "1>", "1>>", ">>":
-				if currCmd.PipedInto != nil {
-					return fmt.Errorf("invalid redirect of stdout when piping")
-				}
-			case "&>", "&>>":
+			case ">", "1>", "1>>", ">>", "&>", "&>>":
 				if currCmd.PipedInto != nil {
 					return fmt.Errorf("invalid redirect of stdout when piping")
 				}
