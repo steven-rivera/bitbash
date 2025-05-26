@@ -23,7 +23,6 @@ const (
 
 func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 	currentLine := []byte{}
-	prevCurrentLine := []byte{}
 	currHistoryIndex := -1
 	prevCharWasTab := false
 
@@ -117,8 +116,7 @@ func ReadLine(cfg *config, stdin *bufio.Reader) (string, error) {
 					currentLine = []byte(cfg.history[currHistoryIndex])
 					fmt.Printf("\r\x1b[K%s%s", ShellPrompt(cfg), currentLine)
 				} else {
-					currentLine = prevCurrentLine
-					fmt.Printf("\r\x1b[K%s%s", ShellPrompt(cfg), currentLine)
+					fmt.Printf("\r\x1b[K%s", ShellPrompt(cfg))
 					currHistoryIndex = -1
 				}
 			}

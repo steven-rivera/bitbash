@@ -53,6 +53,12 @@ func GetBuiltInCommands() map[string]BuiltInCommand {
 			Description: "print this help message",
 			Handler:     HandlerHelp,
 		},
+		"history": BuiltInCommand{
+			Name:        "history",
+			Usage:       "history [<n>]",
+			Description: "lists previously executed commands",
+			Handler:     HandlerHistory,
+		},
 	}
 }
 
@@ -61,6 +67,7 @@ func HandlerCd(cmd *Command, cfg *config) {
 	defer cmd.Close()
 	if len(cmd.Args) != 1 {
 		fmt.Fprintf(cmd.Stderr, "cd: expected 1 argument got %d\r\n", len(cmd.Args))
+		return
 	}
 	dir := cmd.Args[0]
 	if dir == "~" {
@@ -69,6 +76,7 @@ func HandlerCd(cmd *Command, cfg *config) {
 
 	if err := os.Chdir(dir); err != nil {
 		fmt.Fprintf(cmd.Stderr, "cd: %s: No such file or directory\r\n", dir)
+		return
 	}
 	cfg.currDirectory, _ = os.Getwd()
 }
@@ -90,11 +98,13 @@ func HandlerExit(cmd *Command, cfg *config) {
 	defer cmd.Close()
 	if len(cmd.Args) != 1 {
 		fmt.Fprintf(cmd.Stderr, "exit: expected 1 argument got %d\r\n", len(cmd.Args))
+		return
 	}
 
 	exitCode, err := strconv.Atoi(cmd.Args[0])
 	if err != nil {
 		fmt.Fprintf(cmd.Stderr, "exit: invalid exit code '%s'\r\n", cmd.Args[0])
+		return
 	}
 
 	// Call because os.Exit won't run defered call
@@ -108,6 +118,7 @@ func HandlerPwd(cmd *Command, cfg *config) {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(cmd.Stderr, "pwd: %s\r\n", err)
+		return
 	}
 	fmt.Fprintf(cmd.Stdout, "%s\r\n", workingDir)
 }
@@ -117,6 +128,7 @@ func HandlerType(cmd *Command, cfg *config) {
 	defer cmd.Close()
 	if len(cmd.Args) != 1 {
 		fmt.Fprintf(cmd.Stderr, "exit: expected 1 argument got %d\r\n", len(cmd.Args))
+		return
 	}
 	commandArg := cmd.Args[0]
 	if _, ok := GetBuiltInCommands()[commandArg]; ok {
@@ -150,5 +162,30 @@ func HandlerHelp(cmd *Command, cfg *config) {
 	for _, builtin := range GetBuiltInCommands() {
 		fmt.Fprintf(cmd.Stdout, "    %s\r\n", builtin.Usage)
 		fmt.Fprintf(cmd.Stdout, "      -%s\r\n\r\n", builtin.Description)
+	}
+}
+
+func HandlerHistory(cmd *Command, cfg *config) {
+	defer cfg.running.Done()
+	defer cmd.Close()
+
+	if len(cmd.Args) >= 2 {
+		fmt.Fprint(cmd.Stderr, "history: too many arguments\r\n")
+	}
+
+	historySize := len(cfg.history)
+	n := historySize
+	if len(cmd.Args) == 1 {
+		size, err := strconv.Atoi(cmd.Args[0])
+		if err != nil {
+			fmt.Fprintf(cmd.Stderr, "history: %s: numeric argument required\r\n", cmd.Args[0])
+		}
+		if size < n {
+			n = size
+		}
+	}
+
+	for i := historySize - n; i < historySize; i++ {
+		fmt.Fprintf(cmd.Stdout, "%d %s\r\n", i+1, cfg.history[i])
 	}
 }
