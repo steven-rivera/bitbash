@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -169,23 +170,44 @@ func HandlerHistory(cmd *Command, cfg *config) {
 	defer cfg.running.Done()
 	defer cmd.Close()
 
-	if len(cmd.Args) >= 2 {
+	if len(cmd.Args) > 2 {
 		fmt.Fprint(cmd.Stderr, "history: too many arguments\r\n")
 	}
 
 	historySize := len(cfg.history)
-	n := historySize
-	if len(cmd.Args) == 1 {
+	switch len(cmd.Args) {
+	case 0:
+		// No arguments, print entire history
+		for i := range historySize {
+			fmt.Fprintf(cmd.Stdout, "%d %s\r\n", i+1, cfg.history[i])
+		}
+	case 1:
+		// One argument, print last n entries
 		size, err := strconv.Atoi(cmd.Args[0])
 		if err != nil {
 			fmt.Fprintf(cmd.Stderr, "history: %s: numeric argument required\r\n", cmd.Args[0])
 		}
+		n := historySize
 		if size < n {
 			n = size
 		}
-	}
-
-	for i := historySize - n; i < historySize; i++ {
-		fmt.Fprintf(cmd.Stdout, "%d %s\r\n", i+1, cfg.history[i])
+		for i := historySize - n; i < historySize; i++ {
+			fmt.Fprintf(cmd.Stdout, "%d %s\r\n", i+1, cfg.history[i])
+		}
+	case 2:
+		// Two arguments, load history from file
+		if cmd.Args[0] != "-r" {
+			fmt.Fprintf(cmd.Stderr, "history: %s: invalid argument\r\n", cmd.Args[0])
+		}
+		historyFile, err := os.Open(cmd.Args[1]) 
+		if err != nil {
+			fmt.Fprintf(cmd.Stderr, "history: could not open history file: %s\r\n", cmd.Args[0])
+		}
+		defer historyFile.Close()
+		
+		history := bufio.NewScanner(historyFile)
+		for history.Scan() {
+			cfg.history = append(cfg.history, history.Text())
+		}
 	}
 }
