@@ -14,6 +14,7 @@ import (
 
 type config struct {
 	history          []string
+	savedUpToIndex   int
 	oldTerminalState *term.State
 	userName         string
 	currDirectory    string

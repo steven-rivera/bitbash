@@ -220,6 +220,22 @@ func HandlerHistory(cmd *Command, cfg *config) {
 			return
 		}
 
+		// Two arguments, append history to file
+		if cmd.Args[0] == "-a" {
+			historyFile, err := os.OpenFile(cmd.Args[1], os.O_WRONLY|os.O_APPEND, 0o666)
+			if err != nil {
+				fmt.Fprintf(cmd.Stderr, "history: could not open history file: %s\r\n", err)
+			}
+			defer historyFile.Close()
+
+			for i := cfg.savedUpToIndex; i < len(cfg.history); i++ {
+				historyFile.Write(fmt.Appendf(nil, "%s\n", cfg.history[i]))
+			}
+			cfg.savedUpToIndex = len(cfg.history)
+
+			return
+		}
+
 		fmt.Fprintf(cmd.Stderr, "history: %s: invalid argument\r\n", cmd.Args[0])
 	default:
 		fmt.Fprint(cmd.Stderr, "history: too many arguments\r\n")
