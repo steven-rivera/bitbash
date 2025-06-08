@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"os/user"
 	"strings"
@@ -28,30 +27,35 @@ func (cfg *config) CleanUp() {
 }
 
 func main() {
-	// Switch terminal from cooked to raw mode
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		log.Fatalf("shell: %s", err)
-	}
-
 	u, err := user.Current()
 	if err != nil {
-		log.Fatalf("shell: %s", err)
+		fmt.Fprintf(os.Stderr, "shell: %s\n", err)
+		return
 	}
 
 	dir, err := os.Getwd()
 	if err != nil {
-		log.Fatalf("shell: %s", err)
+		fmt.Fprintf(os.Stderr, "shell: %s\n", err)
+		return
 	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatalf("shell: %s", err)
+		fmt.Fprintf(os.Stderr, "shell: %s\n", err)
+		return
 	}
 
 	history, err := loadHistory()
 	if err != nil {
-		log.Fatalf("shell: failed to load history file: %s", err)
+		fmt.Fprintf(os.Stderr, "shell: failed to load history file: %s\n", err)
+		return
+	}
+
+	// Switch terminal from cooked to raw mode
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "shell: %s", err)
+		return
 	}
 
 	cfg := &config{
