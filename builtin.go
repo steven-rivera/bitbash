@@ -56,8 +56,8 @@ func GetBuiltInCommands() map[string]BuiltInCommand {
 		},
 		"history": BuiltInCommand{
 			Name:        "history",
-			Usage:       "history [<n>]",
-			Description: "lists previously executed commands",
+			Usage:       "history [<n> | (-r|-w|-a) <path_to_history_file>]",
+			Description: "list previously executed commands or load/write/append commands from/to a file",
 			Handler:     HandlerHistory,
 		},
 	}
@@ -106,6 +106,18 @@ func HandlerExit(cmd *Command, cfg *config) {
 	if err != nil {
 		fmt.Fprintf(cmd.Stderr, "exit: invalid exit code '%s'\r\n", cmd.Args[0])
 		return
+	}
+
+	path, ok := os.LookupEnv("HISTFILE")
+	if ok {
+		// Save history before exiting if HISTFILE environment variables is specified
+		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o666)
+		if err == nil {
+			for i := cfg.savedUpToIndex; i < len(cfg.history); i++ {
+				file.Write(fmt.Appendf(nil, "%s\n", cfg.history[i]))
+			}
+			file.Close()
+		}
 	}
 
 	// Call because os.Exit won't run defered call

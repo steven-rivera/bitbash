@@ -56,6 +56,7 @@ func main() {
 
 	cfg := &config{
 		history:          history,
+		savedUpToIndex:   len(history),
 		oldTerminalState: oldState,
 		userName:         u.Username,
 		currDirectory:    dir,
