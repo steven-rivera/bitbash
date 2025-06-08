@@ -1,0 +1,1 @@
+HISTFILE="history.txt" go run .

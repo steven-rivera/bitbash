@@ -1,0 +1,3 @@
+help
+grep -i -n "error" /var/log/syslog > errors.txt
+ps aux | awk '{printf "USER=%s PID=%s\n", $1, $2}' | grep "(postgres|root)" -En --color=always
