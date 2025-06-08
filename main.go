@@ -49,8 +49,13 @@ func main() {
 		log.Fatalf("shell: %s", err)
 	}
 
+	history, err := loadHistory()
+	if err != nil {
+		log.Fatalf("shell: failed to load history file: %s", err)
+	}
+
 	cfg := &config{
-		history:          make([]string, 0),
+		history:          history,
 		oldTerminalState: oldState,
 		userName:         u.Username,
 		currDirectory:    dir,
@@ -61,6 +66,28 @@ func main() {
 
 	printWelcomeMessage()
 	startREPL(cfg)
+}
+
+func loadHistory() ([]string, error) {
+	history := make([]string, 0)
+
+	path, ok := os.LookupEnv("HISTFILE")
+	if !ok {
+		return history, nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	s := bufio.NewScanner(file)
+	for s.Scan() {
+		history = append(history, s.Text())
+	}
+
+	return history, nil
 }
 
 func startREPL(cfg *config) {
