@@ -18,43 +18,43 @@ type BuiltInCommand struct {
 
 func GetBuiltInCommands() map[string]BuiltInCommand {
 	return map[string]BuiltInCommand{
-		"exit": BuiltInCommand{
+		"exit": {
 			Name:        "exit",
-			Usage:       "exit <code>",
+			Usage:       "exit [<code>]",
 			Description: "cause the shell to exit with provided code",
 			Handler:     HandlerExit,
 		},
-		"echo": BuiltInCommand{
+		"echo": {
 			Name:        "echo",
 			Usage:       "echo [arg...]",
 			Description: "print all arguments separated by a space to stdout",
 			Handler:     HandlerEcho,
 		},
-		"type": BuiltInCommand{
+		"type": {
 			Name:        "type",
 			Usage:       "type <command>",
 			Description: "print whether command is builtin, if not print location of executatable",
 			Handler:     HandlerType,
 		},
-		"pwd": BuiltInCommand{
+		"pwd": {
 			Name:        "pwd",
 			Usage:       "pwd",
 			Description: "print the current working directory",
 			Handler:     HandlerPwd,
 		},
-		"cd": BuiltInCommand{
+		"cd": {
 			Name:        "cd",
 			Usage:       "cd <directory>",
 			Description: "change the current working directory to the provided directory",
 			Handler:     HandlerCd,
 		},
-		"help": BuiltInCommand{
+		"help": {
 			Name:        "help",
 			Usage:       "help",
 			Description: "print this help message",
 			Handler:     HandlerHelp,
 		},
-		"history": BuiltInCommand{
+		"history": {
 			Name:        "history",
 			Usage:       "history [<n> | (-r|-w|-a) <path_to_history_file>]",
 			Description: "list previously executed commands or load/write/append commands from/to a file",
@@ -97,15 +97,21 @@ func HandlerEcho(cmd *Command, cfg *config) {
 func HandlerExit(cmd *Command, cfg *config) {
 	defer cfg.running.Done()
 	defer cmd.Close()
-	if len(cmd.Args) != 1 {
+
+	exitCode := 0
+
+	if len(cmd.Args) > 1 {
 		fmt.Fprintf(cmd.Stderr, "exit: expected 1 argument got %d\r\n", len(cmd.Args))
 		return
 	}
 
-	exitCode, err := strconv.Atoi(cmd.Args[0])
-	if err != nil {
-		fmt.Fprintf(cmd.Stderr, "exit: invalid exit code '%s'\r\n", cmd.Args[0])
-		return
+	if len(cmd.Args) == 1 {
+		num, err := strconv.Atoi(cmd.Args[0])
+		if err != nil {
+			fmt.Fprintf(cmd.Stderr, "exit: invalid exit code '%s'\r\n", cmd.Args[0])
+			return
+		}
+		exitCode = num
 	}
 
 	path, ok := os.LookupEnv("HISTFILE")
@@ -157,7 +163,17 @@ func HandlerType(cmd *Command, cfg *config) {
 		}
 
 		for _, dirEntry := range dirEntries {
-			if !dirEntry.IsDir() && dirEntry.Name() == commandArg {
+			if dirEntry.IsDir() || dirEntry.Name() != commandArg {
+				continue
+			}
+
+			info, err := dirEntry.Info()
+			if err != nil {
+				continue
+			}
+
+			// Ensure that file is executable
+			if info.Mode()&0111 != 0 {
 				fmt.Fprintf(cmd.Stdout, "%s is %s\r\n", commandArg, filepath.Join(dir, commandArg))
 				return
 			}
