@@ -43,7 +43,7 @@ Type `help` at the prompt to list all built-in commands and available features.
 You can install BitBash using:
 
 ```bash
-go install github.com/steven-rivera/bitbash@latest
+go install github.com/steven-rivera/bitbash/bitbash@latest
 ```
 
 Once installed, run:
