@@ -5,156 +5,102 @@ import (
 	"fmt"
 	"os"
 	"os/user"
-	"strings"
 	"sync"
 
 	"golang.org/x/term"
 )
 
 type config struct {
-	history          []string
-	savedUpToIndex   int
-	oldTerminalState *term.State
-	userName         string
-	currDirectory    string
-	homeDirectory    string
-	running          *sync.WaitGroup
+	history             []string
+	saved_up_to_index   int
+	prev_terminal_state *term.State
+	user_name           string
+	curr_dir            string
+	home_dir            string
+	running             *sync.WaitGroup
 }
 
-func (cfg *config) CleanUp() {
+func (cfg *config) restore_terminal() {
 	// Restore terminal to previouse state before exiting
-	term.Restore(int(os.Stdin.Fd()), cfg.oldTerminalState)
+	term.Restore(int(os.Stdin.Fd()), cfg.prev_terminal_state)
+}
+
+func (cfg *config) load_history() error {
+	cfg.history = make([]string, 0)
+
+	path, ok := os.LookupEnv("HISTFILE")
+	if !ok {
+		return nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	s := bufio.NewScanner(file)
+	for s.Scan() {
+		cfg.history = append(cfg.history, s.Text())
+	}
+
+	cfg.saved_up_to_index = len(cfg.history)
+
+	return nil
+}
+
+func (cfg *config) shell_prompt() string {
+	//if cut, ok := strings.CutPrefix(cfg.currDirectory, cfg.homeDirectory); ok {
+	//	cfg.currDirectory = fmt.Sprintf("~%s", cut)
+	//}
+	//userNameBlueBold := fmt.Sprintf("%s%s%s%s", BLUE, BOLD, cfg.userName, RESET)
+	//currDirGreenBold := fmt.Sprintf("%s%s%s%s", GREEN, BOLD, cfg.currDirectory, RESET)
+	//return fmt.Sprintf("%s:%s $ ", userNameBlueBold, currDirGreenBold)
+	return "$ "
 }
 
 func main() {
 	u, err := user.Current()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "shell: %s\n", err)
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 		return
 	}
 
 	dir, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "shell: %s\n", err)
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 		return
 	}
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "shell: %s\n", err)
-		return
-	}
-
-	history, err := loadHistory()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "shell: failed to load history file: %s\n", err)
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 		return
 	}
 
 	// Switch terminal from cooked to raw mode
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "shell: %s", err)
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 		return
 	}
 
 	cfg := &config{
-		history:          history,
-		savedUpToIndex:   len(history),
-		oldTerminalState: oldState,
-		userName:         u.Username,
-		currDirectory:    dir,
-		homeDirectory:    home,
-		running:          &sync.WaitGroup{},
+		prev_terminal_state: oldState,
+		user_name:           u.Username,
+		curr_dir:            dir,
+		home_dir:            home,
+		running:             &sync.WaitGroup{},
 	}
-	defer cfg.CleanUp()
+	defer cfg.restore_terminal()
 
-	printWelcomeMessage()
-	startREPL(cfg)
-}
-
-func loadHistory() ([]string, error) {
-	history := make([]string, 0)
-
-	path, ok := os.LookupEnv("HISTFILE")
-	if !ok {
-		return history, nil
+	if err := cfg.load_history(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load history file: %s\r\n", err)
+		return
 	}
 
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
+	if err := run_repl(cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "%s\r\n", err)
+		return
 	}
-	defer file.Close()
-
-	s := bufio.NewScanner(file)
-	for s.Scan() {
-		history = append(history, s.Text())
-	}
-
-	return history, nil
-}
-
-func startREPL(cfg *config) {
-	stdin := bufio.NewReader(os.Stdin)
-
-	for {
-		input, err := ReadLine(cfg, stdin)
-		if err != nil {
-			fmt.Print("\r\n")
-			return
-		}
-
-		trimmedInput := strings.TrimSpace(input)
-		if len(trimmedInput) == 0 {
-			continue
-		}
-		cfg.history = append(cfg.history, trimmedInput)
-
-		command, err := NewCommand(trimmedInput)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "shell: %s\r\n", err)
-			continue
-		}
-
-		command.Exec(cfg)
-	}
-}
-
-func printWelcomeMessage() {
-	fmt.Print(GREEN)
-	fmt.Print(`________   ___   _________   ________   ________   ________   ___  ___      `, "\r\n")
-	fmt.Print(`|\   __  \ |\  \ |\___   ___\|\   __  \ |\   __  \ |\   ____\ |\  \|\  \    `, "\r\n")
-	fmt.Print(`\ \  \|\ /_\ \  \\|___ \  \_|\ \  \|\ /_\ \  \|\  \\ \  \___|_\ \  \\\  \   `, "\r\n")
-	fmt.Print(` \ \   __  \\ \  \    \ \  \  \ \   __  \\ \   __  \\ \_____  \\ \   __  \  `, "\r\n")
-	fmt.Print(`  \ \  \|\  \\ \  \    \ \  \  \ \  \|\  \\ \  \ \  \\|____|\  \\ \  \ \  \ `, "\r\n")
-	fmt.Print(`   \ \_______\\ \__\    \ \__\  \ \_______\\ \__\ \__\ ____\_\  \\ \__\ \__\`, "\r\n")
-	fmt.Print(`    \|_______| \|__|     \|__|   \|_______| \|__|\|__||\_________\\|__|\|__|`, "\r\n")
-	fmt.Print(`                                                      \|_________|          `, "\r\n")
-	fmt.Print(RESET)
-
-	fmt.Print("\r\nWelcome to BitBash! Here is a list of supported features:\r\n\r\n")
-
-	fmt.Print("Redirection:\r\n")
-	fmt.Print("    <            Redirect stdin from file\r\n")
-	fmt.Print("    >  >>        Redirect stdout to file\r\n")
-	fmt.Print("    2>  2>>      Redirect stderr to file\r\n")
-	fmt.Print("    &>  &>>      Redirect botth stdin and stderr to file\r\n")
-	fmt.Print("\r\n")
-	fmt.Print("Piping:\r\n")
-	fmt.Print("    |            Redirect the stdout of one command to the stdin of another\r\n")
-	fmt.Print("\r\n")
-	fmt.Print("Autocomplete:\r\n")
-	fmt.Print("    TAB          Attempt to complete or partially complete the name of the commnd\r\n")
-	fmt.Print("    TAB TAB      If multiple autocomplete matches print them all\r\n")
-	fmt.Print("\r\n")
-	fmt.Print("Quoting:\r\n")
-	fmt.Print("    '...'            Characters quoted in single quotes preserve their literal value\r\n")
-	fmt.Print(`    "..."            Same as single quotes but processes the escape sequences \\, \$, and \"`, "\r\n")
-	fmt.Print("Command History:\r\n")
-	fmt.Print("\r\n")
-	fmt.Print("    Up Arrow     Replace current line with previous command in history\r\n")
-	fmt.Print("    Down Arrow   Replace current line with next command in history\r\n")
-
-	fmt.Print("\r\nType help for a list of builtin commands.\r\n")
 }

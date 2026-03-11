@@ -4,7 +4,7 @@
 
 ![logo](images/ascii-art.png)
 
-## ✨ Features
+## Features
 
 ### Redirection
 
@@ -38,7 +38,7 @@ Type `help` at the prompt to list all built-in commands and available features.
 
 <br>
 
-## 🛠 Installation
+## Installation
 
 You can install BitBash using:
 

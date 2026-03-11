@@ -32,7 +32,7 @@ func TestReadLine(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res, _ := ReadLine(&config{}, bufio.NewReader(strings.NewReader(tc.input)))
+			res, _ := read_line(&config{}, bufio.NewReader(strings.NewReader(tc.input)))
 			if res != tc.expected {
 				t.Fatalf("expected: %#v, got: %#v", tc.expected, res)
 			}
@@ -131,7 +131,6 @@ func TestSplitInput(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			res, _ := SplitInput(tc.input)
-			reflect.DeepEqual(res, tc.expected)
 			if !reflect.DeepEqual(res, tc.expected) {
 				t.Fatalf("expected: %#v, got: %#v", tc.expected, res)
 			}

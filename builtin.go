@@ -72,14 +72,14 @@ func HandlerCd(cmd *Command, cfg *config) {
 	}
 	dir := cmd.Args[0]
 	if dir == "~" {
-		dir = cfg.homeDirectory
+		dir = cfg.home_dir
 	}
 
 	if err := os.Chdir(dir); err != nil {
 		fmt.Fprintf(cmd.Stderr, "cd: %s: No such file or directory\r\n", dir)
 		return
 	}
-	cfg.currDirectory, _ = os.Getwd()
+	cfg.curr_dir, _ = os.Getwd()
 }
 
 func HandlerEcho(cmd *Command, cfg *config) {
@@ -119,7 +119,7 @@ func HandlerExit(cmd *Command, cfg *config) {
 		// Save history before exiting if HISTFILE environment variables is specified
 		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o666)
 		if err == nil {
-			for i := cfg.savedUpToIndex; i < len(cfg.history); i++ {
+			for i := cfg.saved_up_to_index; i < len(cfg.history); i++ {
 				file.Write(fmt.Appendf(nil, "%s\n", cfg.history[i]))
 			}
 			file.Close()
@@ -127,7 +127,7 @@ func HandlerExit(cmd *Command, cfg *config) {
 	}
 
 	// Call because os.Exit won't run defered call
-	cfg.CleanUp()
+	cfg.restore_terminal()
 	os.Exit(exitCode)
 }
 
@@ -256,10 +256,10 @@ func HandlerHistory(cmd *Command, cfg *config) {
 			}
 			defer historyFile.Close()
 
-			for i := cfg.savedUpToIndex; i < len(cfg.history); i++ {
+			for i := cfg.saved_up_to_index; i < len(cfg.history); i++ {
 				historyFile.Write(fmt.Appendf(nil, "%s\n", cfg.history[i]))
 			}
-			cfg.savedUpToIndex = len(cfg.history)
+			cfg.saved_up_to_index = len(cfg.history)
 
 			return
 		}
