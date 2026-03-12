@@ -139,11 +139,12 @@ func (ls *line_state) tab_completion(cfg *config) {
 
 	start, is_cmd := ls.get_prefix_start()
 	prefix := string(ls.line[start:ls.cursor_idx])
+	path, name := split_prefix(prefix)
 
 	if is_cmd {
-		matches = auto_complete_command(prefix)
+		matches = auto_complete_command(path, name)
 	} else {
-		matches = auto_complete_file_name(prefix)
+		matches = auto_complete_file_name(path, name)
 	}
 
 	if len(matches) == 0 {
@@ -153,7 +154,7 @@ func (ls *line_state) tab_completion(cfg *config) {
 
 	if len(matches) == 1 {
 		before, after := ls.line[:start], ls.line[ls.cursor_idx:]
-		matched := fmt.Sprintf("%s%s %s", before, matches[0], after)
+		matched := fmt.Sprintf("%s%s%s %s", before, path, matches[0], after)
 		ls.set_line(matched)
 		ls.cursor_idx -= len(after)
 		move_cursor_left(len(after))
@@ -162,10 +163,12 @@ func (ls *line_state) tab_completion(cfg *config) {
 
 	fmt.Print("\a")
 
+	
+
 	// check for partial completions
-	if lcp := longest_common_prefix(matches); lcp != prefix {
+	if lcp := longest_common_prefix(matches); lcp != name {
 		before, after := ls.line[:start], ls.line[ls.cursor_idx:]
-		partial_match := fmt.Sprintf("%s%s%s", before, lcp, after)
+		partial_match := fmt.Sprintf("%s%s%s%s", before, path, lcp, after)
 		ls.set_line(partial_match)
 		ls.cursor_idx -= len(after)
 		move_cursor_left(len(after))
@@ -203,11 +206,19 @@ func (ls *line_state) get_prefix_start() (start int, is_cmd bool) {
 	return prefix_start, cmd_start == prefix_start
 }
 
-func auto_complete_command(partial string) []string {
+func split_prefix(prefix string) (path string, name string) {
+	idx := strings.LastIndexByte(prefix, '/')
+	if idx == -1 {
+		return "", prefix
+	}
+	return prefix[:idx+1], prefix[idx+1:]
+}
+
+func auto_complete_command(path string, prefix string) []string {
 	matches_set := make(map[string]struct{})
 
 	for command := range GetBuiltInCommands() {
-		if strings.HasPrefix(command, partial) {
+		if strings.HasPrefix(command, prefix) {
 			matches_set[command] = struct{}{}
 		}
 	}
@@ -219,7 +230,7 @@ func auto_complete_command(partial string) []string {
 		}
 
 		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasPrefix(entry.Name(), partial) {
+			if entry.IsDir() || !strings.HasPrefix(entry.Name(), prefix) {
 				continue
 			}
 
@@ -237,16 +248,20 @@ func auto_complete_command(partial string) []string {
 	return matches
 }
 
-func auto_complete_file_name(partial string) []string {
+func auto_complete_file_name(path string, prefix string) []string {
 	matches_set := make(map[string]struct{})
 
-	entries, err := os.ReadDir(".")
+	if path == "" {
+		path = "."
+	}
+
+	entries, err := os.ReadDir(path)
 	if err != nil {
 		return []string{}
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasPrefix(entry.Name(), partial) {
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), prefix) {
 			continue
 		}
 
