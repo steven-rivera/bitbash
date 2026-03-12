@@ -19,6 +19,11 @@ const (
 	ARROW_LEFT  = "[D"
 )
 
+type tab_match struct {
+	match  string
+	is_dir bool
+}
+
 type line_state struct {
 	line                   []byte
 	prev_line              []byte
@@ -135,11 +140,10 @@ func (ls *line_state) handle_arrow_key_left() {
 }
 
 func (ls *line_state) tab_completion(cfg *config) {
-	var matches []string
+	var matches []tab_match
 
 	start, is_cmd := ls.get_prefix_start()
-	prefix := string(ls.line[start:ls.cursor_idx])
-	path, name := split_prefix(prefix)
+	path, name := split_prefix(string(ls.line[start:ls.cursor_idx]))
 
 	if is_cmd {
 		matches = auto_complete_command(path, name)
@@ -154,8 +158,14 @@ func (ls *line_state) tab_completion(cfg *config) {
 
 	if len(matches) == 1 {
 		before, after := ls.line[:start], ls.line[ls.cursor_idx:]
-		matched := fmt.Sprintf("%s%s%s %s", before, path, matches[0], after)
-		ls.set_line(matched)
+		new_line := ""
+		if matches[0].is_dir {
+			new_line = fmt.Sprintf("%s%s%s/%s", before, path, matches[0].match, after)
+		} else {
+			new_line = fmt.Sprintf("%s%s%s %s", before, path, matches[0].match, after)
+		}
+
+		ls.set_line(new_line)
 		ls.cursor_idx -= len(after)
 		move_cursor_left(len(after))
 		return
@@ -163,22 +173,32 @@ func (ls *line_state) tab_completion(cfg *config) {
 
 	fmt.Print("\a")
 
-	
-
 	// check for partial completions
 	if lcp := longest_common_prefix(matches); lcp != name {
 		before, after := ls.line[:start], ls.line[ls.cursor_idx:]
 		partial_match := fmt.Sprintf("%s%s%s%s", before, path, lcp, after)
+
 		ls.set_line(partial_match)
 		ls.cursor_idx -= len(after)
 		move_cursor_left(len(after))
+
 		ls.next_tab_auto_complete = false
 		return
 	}
 
 	// if TAB pressed twice in sequence, print all matches on new line
 	if ls.next_tab_auto_complete {
-		fmt.Printf("\r\n%s", strings.Join(matches, "  "))
+		matches_str := ""
+		for _, match := range matches {
+			matches_str += match.match
+			if match.is_dir {
+				matches_str += "/   "
+			} else {
+				matches_str += "   "
+			}
+		}
+
+		fmt.Printf("\r\n%s", matches_str)
 		fmt.Printf("\r\n%s%s", cfg.shell_prompt(), ls.line)
 		return
 	}
@@ -214,12 +234,15 @@ func split_prefix(prefix string) (path string, name string) {
 	return prefix[:idx+1], prefix[idx+1:]
 }
 
-func auto_complete_command(path string, prefix string) []string {
-	matches_set := make(map[string]struct{})
+func auto_complete_command(path string, prefix string) []tab_match {
+	matches_set := make(map[tab_match]struct{})
 
 	for command := range GetBuiltInCommands() {
 		if strings.HasPrefix(command, prefix) {
-			matches_set[command] = struct{}{}
+			matches_set[tab_match{
+				match:  command,
+				is_dir: false,
+			}] = struct{}{}
 		}
 	}
 
@@ -234,22 +257,27 @@ func auto_complete_command(path string, prefix string) []string {
 				continue
 			}
 
-			matches_set[entry.Name()] = struct{}{}
+			matches_set[tab_match{
+				match:  entry.Name(),
+				is_dir: false,
+			}] = struct{}{}
 		}
 	}
 
-	matches := make([]string, 0, len(matches_set))
+	matches := make([]tab_match, 0, len(matches_set))
 	for cmd := range matches_set {
 		matches = append(matches, cmd)
 	}
 
-	slices.Sort(matches)
+	slices.SortFunc(matches, func(a, b tab_match) int {
+		return strings.Compare(a.match, b.match)
+	})
 
 	return matches
 }
 
-func auto_complete_file_name(path string, prefix string) []string {
-	matches_set := make(map[string]struct{})
+func auto_complete_file_name(path string, prefix string) []tab_match {
+	matches_set := make(map[tab_match]struct{})
 
 	if path == "" {
 		path = "."
@@ -257,39 +285,45 @@ func auto_complete_file_name(path string, prefix string) []string {
 
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return []string{}
+		return []tab_match{}
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasPrefix(entry.Name(), prefix) {
+		if !strings.HasPrefix(entry.Name(), prefix) {
 			continue
 		}
 
-		matches_set[entry.Name()] = struct{}{}
+		matches_set[tab_match{
+			match:  entry.Name(),
+			is_dir: entry.IsDir(),
+		}] = struct{}{}
 	}
 
-	matches := make([]string, 0, len(matches_set))
+	matches := make([]tab_match, 0, len(matches_set))
 	for cmd := range matches_set {
 		matches = append(matches, cmd)
 	}
 
-	slices.Sort(matches)
+	slices.SortFunc(matches, func(a, b tab_match) int {
+		return strings.Compare(a.match, b.match)
+	})
 
 	return matches
+
 }
 
-func longest_common_prefix(strs []string) string {
+func longest_common_prefix(matches []tab_match) string {
 	lcp := strings.Builder{}
 	for i := 0; ; i++ {
 		var currChar byte
-		for j, str := range strs {
-			if i >= len(str) {
+		for j, match := range matches {
+			if i >= len(match.match) {
 				return lcp.String()
 			}
 			if j == 0 {
-				currChar = str[i]
+				currChar = match.match[i]
 			}
-			if str[i] != currChar {
+			if match.match[i] != currChar {
 				return lcp.String()
 			}
 		}
