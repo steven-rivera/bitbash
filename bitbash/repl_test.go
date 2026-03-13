@@ -42,7 +42,7 @@ func TestReadLine(t *testing.T) {
 			expected: "echo ",
 		},
 		{
-			name:     "partial tab completion",
+			name:     "partial command tab completion",
 			input:    "git-u\t\n",
 			expected: "git-upload-",
 		},
@@ -50,6 +50,36 @@ func TestReadLine(t *testing.T) {
 			name:     "delete characters",
 			input:    fmt.Sprintf("echoss%c%c\n", DEL, DEL),
 			expected: "echo",
+		},
+		{
+			name:     "move cursor back",
+			input:    fmt.Sprintf("echo%s \n", CURSOR_BACK),
+			expected: "ech o",
+		},
+		{
+			name:     "file tab completion",
+			input:    "cat main\t\n",
+			expected: "cat main.go ",
+		},
+		{
+			name:     "file tab completion #2",
+			input:    fmt.Sprintf("cat repl.go%s%s%s%s%s%s%smain\t\n", CURSOR_BACK, CURSOR_BACK, CURSOR_BACK, CURSOR_BACK, CURSOR_BACK, CURSOR_BACK, CURSOR_BACK),
+			expected: "cat main.go repl.go",
+		},
+		{
+			name:     "file tab completion inside directory",
+			input:    "cat ../test/foo.\t\n",
+			expected: "cat ../test/foo.txt ",
+		},
+		{
+			name:     "partial file tab completion inside directory",
+			input:    "cat ../test/b\t\n",
+			expected: "cat ../test/ba",
+		},
+		{
+			name:     "directory tab completion",
+			input:    "cd ../tes\t\n",
+			expected: "cd ../test/",
 		},
 	}
 

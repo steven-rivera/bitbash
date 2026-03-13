@@ -14,7 +14,8 @@ const (
 
 	RESET             = "\x1b[0m"
 	BOLD              = "\x1b[1m"
-	CURSOR_FORWARD    = "\x1b[1C"
+	CURSOR_FORWARD    = "\x1b[C"
+	CURSOR_BACK       = "\x1b[D"
 	CLEAR_FROM_CURSOR = "\x1b[K"
 
 	BLACK   = "\x1b[30m"
