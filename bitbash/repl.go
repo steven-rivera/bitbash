@@ -15,6 +15,16 @@ type line_state struct {
 	show_all_matches bool
 }
 
+func new_line_state() *line_state {
+	return &line_state{
+		line:             make([]byte, 0),
+		prev_line:        make([]byte, 0),
+		cursor_idx:       0,
+		history_idx:      -1,
+		show_all_matches: false,
+	}
+}
+
 func (ls *line_state) insert_byte(b byte) {
 	if ls.cursor_idx == len(ls.line) {
 		ls.line = append(ls.line, b)
@@ -68,13 +78,13 @@ func (ls *line_state) set_line(line string) {
 
 func (ls *line_state) handle_arrow_key(cfg *config, seq string) {
 	switch seq {
-	case ARROW_UP:
+	case CURSOR_UP:
 		ls.handle_arrow_key_up(cfg)
-	case ARROW_DOWN:
+	case CURSOR_DOWN:
 		ls.handle_arrow_key_down(cfg)
-	case ARROW_RIGHT:
+	case CURSOR_FORWARD:
 		ls.handle_arrow_key_right()
-	case ARROW_LEFT:
+	case CURSOR_BACK:
 		ls.handle_arrow_key_left()
 	}
 }
@@ -210,15 +220,33 @@ func (ls *line_state) get_prefix_start() (start int, is_cmd bool) {
 	return prefix_start, cmd_start == prefix_start
 }
 
-func read_line(cfg *config, stdin *bufio.Reader) (string, error) {
-	line := &line_state{
-		line:             make([]byte, 0),
-		prev_line:        make([]byte, 0),
-		history_idx:      -1,
-		show_all_matches: false,
+func read_control_sequence_introducer(stdin *bufio.Reader) []byte {
+	char, err := stdin.ReadByte()
+	if err != nil || char != '[' {
+		return []byte{}
 	}
 
+	csi := []byte{ESC, '['}
+
+	for {
+		char, err := stdin.ReadByte()
+		if err != nil {
+			return []byte{}
+		}
+
+		csi = append(csi, char)
+
+		// CSI sequences end in a char in the following range
+		if '\x40' <= char && char <= '\x7E' {
+			return csi
+		}
+	}
+}
+
+func read_line(cfg *config, stdin *bufio.Reader) (string, error) {
+
 	fmt.Print(cfg.shell_prompt())
+	line := new_line_state()
 
 	for {
 		char, err := stdin.ReadByte()
@@ -227,7 +255,7 @@ func read_line(cfg *config, stdin *bufio.Reader) (string, error) {
 		}
 
 		switch char {
-		case '\n', '\r':
+		case '\r', '\n':
 			return string(line.line), nil
 		case EOT:
 			return "", fmt.Errorf("End of Text")
@@ -236,16 +264,13 @@ func read_line(cfg *config, stdin *bufio.Reader) (string, error) {
 		case DEL:
 			line.delete_byte()
 		case ESC:
-			seq := make([]byte, 2)
-			stdin.Read(seq)
-			line.handle_arrow_key(cfg, string(seq))
+			line.handle_arrow_key(cfg, string(read_control_sequence_introducer(stdin)))
 		default:
 			if char < 32 || char > 126 {
-				fmt.Printf("\r\nline='%+v' idx=%+v", string(line.line), line.cursor_idx)
-			} else {
-				line.insert_byte(char)
+				continue
 			}
 
+			line.insert_byte(char)
 		}
 
 		if char != '\t' {
@@ -278,7 +303,7 @@ func printWelcomeMessage() {
 	fmt.Print("    |            Redirect the stdout of one command to the stdin of another\r\n")
 	fmt.Print("\r\n")
 	fmt.Print("Autocomplete:\r\n")
-	fmt.Print("    TAB          Attempt to complete or partially complete the name of the commnd\r\n")
+	fmt.Print("    TAB          Attempt to complete or partially complete the name of a commnd or file\r\n")
 	fmt.Print("    TAB TAB      If multiple autocomplete matches print them all\r\n")
 	fmt.Print("\r\n")
 	fmt.Print("Quoting:\r\n")

@@ -7,13 +7,10 @@ const (
 	DEL = byte(127) // Sent when pressed Backspace
 	ESC = byte(27)
 
-	ARROW_UP    = "[A"
-	ARROW_DOWN  = "[B"
-	ARROW_RIGHT = "[C"
-	ARROW_LEFT  = "[D"
-
 	RESET             = "\x1b[0m"
 	BOLD              = "\x1b[1m"
+	CURSOR_UP         = "\x1b[A"
+	CURSOR_DOWN       = "\x1b[B"
 	CURSOR_FORWARD    = "\x1b[C"
 	CURSOR_BACK       = "\x1b[D"
 	CLEAR_FROM_CURSOR = "\x1b[K"
