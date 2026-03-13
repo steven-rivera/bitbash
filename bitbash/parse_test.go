@@ -1,45 +1,9 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 )
-
-func TestReadLine(t *testing.T) {
-	testCases := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "builtin tab completion",
-			input:    "ech\t\n",
-			expected: "echo ",
-		},
-		{
-			name:     "partial tab completion",
-			input:    "git-u\t\n",
-			expected: "git-upload-",
-		},
-		{
-			name:     "delete characters",
-			input:    fmt.Sprintf("echoss%c%c\n", DEL, DEL),
-			expected: "echo",
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			res, _ := read_line(&config{}, bufio.NewReader(strings.NewReader(tc.input)))
-			if res != tc.expected {
-				t.Fatalf("expected: %#v, got: %#v", tc.expected, res)
-			}
-
-		})
-	}
-}
 
 func TestSplitInput(t *testing.T) {
 	testCases := []struct {

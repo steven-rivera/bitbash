@@ -4,43 +4,31 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 )
 
-const (
-	EOT = byte(4)   // Ctrl+D
-	DEL = byte(127) // Backspace
-	ESC = byte(27)  // ESC
-
-	ARROW_UP    = "[A"
-	ARROW_DOWN  = "[B"
-	ARROW_RIGHT = "[C"
-	ARROW_LEFT  = "[D"
-)
-
-type tab_match struct {
-	match  string
-	is_dir bool
-}
-
 type line_state struct {
-	line                   []byte
-	prev_line              []byte
-	cursor_idx             int
-	history_idx            int
-	next_tab_auto_complete bool
+	line             []byte
+	prev_line        []byte
+	cursor_idx       int
+	history_idx      int
+	show_all_matches bool
 }
 
 func (ls *line_state) insert_byte(b byte) {
-	ls.line = append(ls.line, 0)
-	copy(ls.line[ls.cursor_idx+1:], ls.line[ls.cursor_idx:])
-	ls.line[ls.cursor_idx] = b
+	if ls.cursor_idx == len(ls.line) {
+		ls.line = append(ls.line, b)
+	} else {
+		ls.line = append(ls.line, 0)
+		copy(ls.line[ls.cursor_idx+1:], ls.line[ls.cursor_idx:])
+		ls.line[ls.cursor_idx] = b
+	}
 
 	ls.cursor_idx++
+	txt_after_cursor := ls.line[ls.cursor_idx:]
 
-	fmt.Printf("%c%s", b, ls.line[ls.cursor_idx:])
-	move_cursor_left(len(ls.line[ls.cursor_idx:]))
+	fmt.Printf("%c%s", b, txt_after_cursor)
+	move_cursor_back(len(txt_after_cursor))
 }
 
 func (ls *line_state) delete_byte() {
@@ -57,15 +45,17 @@ func (ls *line_state) delete_byte() {
 	}
 
 	ls.cursor_idx--
+	txt_after_cursor := ls.line[ls.cursor_idx:]
 
-	move_cursor_left(1)
-	fmt.Printf("\x1b[K%s", ls.line[ls.cursor_idx:])
-	move_cursor_left(len(ls.line[ls.cursor_idx:]))
+	move_cursor_back(1)
+	fmt.Printf("%s%s", CLEAR_FROM_CURSOR, txt_after_cursor)
+	move_cursor_back(len(txt_after_cursor))
 }
 
 func (ls *line_state) clear_line() {
-	move_cursor_left(ls.cursor_idx)
-	fmt.Printf("\x1b[K")
+	move_cursor_back(ls.cursor_idx)
+	fmt.Print(CLEAR_FROM_CURSOR)
+	ls.cursor_idx = 0
 }
 
 func (ls *line_state) set_line(line string) {
@@ -126,7 +116,7 @@ func (ls *line_state) handle_arrow_key_right() {
 	}
 
 	ls.cursor_idx++
-	move_cursor_right(1)
+	move_cursor_forward(1)
 }
 
 func (ls *line_state) handle_arrow_key_left() {
@@ -136,76 +126,70 @@ func (ls *line_state) handle_arrow_key_left() {
 	}
 
 	ls.cursor_idx--
-	move_cursor_left(1)
+	move_cursor_back(1)
+}
+
+func (ls *line_state) print_match(prefix_start int, match match) {
+	before := string(ls.line[:prefix_start])
+	after := string(ls.line[ls.cursor_idx:])
+	new_line := ""
+
+	if match.is_dir {
+		new_line = fmt.Sprintf("%s%s/%s", before, match.full_path(), after)
+	} else {
+		new_line = fmt.Sprintf("%s%s %s", before, match.full_path(), after)
+	}
+
+	ls.set_line(new_line)
+	move_cursor_back(len(after))
+	ls.cursor_idx -= len(after)
+}
+
+func (ls *line_state) print_partial_match(prefix_start int, dir, partial string) {
+	before := string(ls.line[:prefix_start])
+	after := string(ls.line[ls.cursor_idx:])
+	new_line := ""
+
+	new_line = fmt.Sprintf("%s%s%s%s", before, dir, partial, after)
+
+	ls.set_line(new_line)
+	move_cursor_back(len(after))
+	ls.cursor_idx -= len(after)
 }
 
 func (ls *line_state) tab_completion(cfg *config) {
-	var matches []tab_match
-
 	start, is_cmd := ls.get_prefix_start()
-	path, name := split_prefix(string(ls.line[start:ls.cursor_idx]))
-
-	if is_cmd {
-		matches = auto_complete_command(path, name)
-	} else {
-		matches = auto_complete_file_name(path, name)
-	}
+	prefix := parse_prefix(string(ls.line[start:ls.cursor_idx]))
+	matches := auto_complete_prefix(prefix, is_cmd)
 
 	if len(matches) == 0 {
 		fmt.Print("\a")
 		return
 	}
-
 	if len(matches) == 1 {
-		before, after := ls.line[:start], ls.line[ls.cursor_idx:]
-		new_line := ""
-		if matches[0].is_dir {
-			new_line = fmt.Sprintf("%s%s%s/%s", before, path, matches[0].match, after)
-		} else {
-			new_line = fmt.Sprintf("%s%s%s %s", before, path, matches[0].match, after)
-		}
-
-		ls.set_line(new_line)
-		ls.cursor_idx -= len(after)
-		move_cursor_left(len(after))
+		ls.print_match(start, matches[0])
 		return
 	}
 
 	fmt.Print("\a")
 
-	// check for partial completions
-	if lcp := longest_common_prefix(matches); lcp != name {
-		before, after := ls.line[:start], ls.line[ls.cursor_idx:]
-		partial_match := fmt.Sprintf("%s%s%s%s", before, path, lcp, after)
-
-		ls.set_line(partial_match)
-		ls.cursor_idx -= len(after)
-		move_cursor_left(len(after))
-
-		ls.next_tab_auto_complete = false
+	if lcp := longest_common_match_prefix(matches); lcp != prefix.base {
+		ls.print_partial_match(start, prefix.dir, lcp)
+		ls.show_all_matches = false
 		return
 	}
 
 	// if TAB pressed twice in sequence, print all matches on new line
-	if ls.next_tab_auto_complete {
-		matches_str := ""
-		for _, match := range matches {
-			matches_str += match.match
-			if match.is_dir {
-				matches_str += "/   "
-			} else {
-				matches_str += "   "
-			}
-		}
-
-		fmt.Printf("\r\n%s", matches_str)
-		fmt.Printf("\r\n%s%s", cfg.shell_prompt(), ls.line)
+	if ls.show_all_matches {
+		fmt.Printf("\r\n%s\r\n%s%s", join_matches(matches), cfg.shell_prompt(), ls.line)
 		return
 	}
 
-	ls.next_tab_auto_complete = true
+	ls.show_all_matches = true
 }
 
+// Returns the starting index of the substring that will be used
+// to attempt to perform autocompletion when TAB is pressed.
 func (ls *line_state) get_prefix_start() (start int, is_cmd bool) {
 	prefix_start := ls.cursor_idx
 	for prefix_start >= 1 {
@@ -226,129 +210,12 @@ func (ls *line_state) get_prefix_start() (start int, is_cmd bool) {
 	return prefix_start, cmd_start == prefix_start
 }
 
-func split_prefix(prefix string) (path string, name string) {
-	idx := strings.LastIndexByte(prefix, '/')
-	if idx == -1 {
-		return "", prefix
-	}
-	return prefix[:idx+1], prefix[idx+1:]
-}
-
-func auto_complete_command(path string, prefix string) []tab_match {
-	matches_set := make(map[tab_match]struct{})
-
-	for command := range GetBuiltInCommands() {
-		if strings.HasPrefix(command, prefix) {
-			matches_set[tab_match{
-				match:  command,
-				is_dir: false,
-			}] = struct{}{}
-		}
-	}
-
-	for dir := range strings.SplitSeq(os.Getenv("PATH"), ":") {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-
-		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasPrefix(entry.Name(), prefix) {
-				continue
-			}
-
-			matches_set[tab_match{
-				match:  entry.Name(),
-				is_dir: false,
-			}] = struct{}{}
-		}
-	}
-
-	matches := make([]tab_match, 0, len(matches_set))
-	for cmd := range matches_set {
-		matches = append(matches, cmd)
-	}
-
-	slices.SortFunc(matches, func(a, b tab_match) int {
-		return strings.Compare(a.match, b.match)
-	})
-
-	return matches
-}
-
-func auto_complete_file_name(path string, prefix string) []tab_match {
-	matches_set := make(map[tab_match]struct{})
-
-	if path == "" {
-		path = "."
-	}
-
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return []tab_match{}
-	}
-
-	for _, entry := range entries {
-		if !strings.HasPrefix(entry.Name(), prefix) {
-			continue
-		}
-
-		matches_set[tab_match{
-			match:  entry.Name(),
-			is_dir: entry.IsDir(),
-		}] = struct{}{}
-	}
-
-	matches := make([]tab_match, 0, len(matches_set))
-	for cmd := range matches_set {
-		matches = append(matches, cmd)
-	}
-
-	slices.SortFunc(matches, func(a, b tab_match) int {
-		return strings.Compare(a.match, b.match)
-	})
-
-	return matches
-
-}
-
-func longest_common_prefix(matches []tab_match) string {
-	lcp := strings.Builder{}
-	for i := 0; ; i++ {
-		var currChar byte
-		for j, match := range matches {
-			if i >= len(match.match) {
-				return lcp.String()
-			}
-			if j == 0 {
-				currChar = match.match[i]
-			}
-			if match.match[i] != currChar {
-				return lcp.String()
-			}
-		}
-		lcp.WriteByte(currChar)
-	}
-}
-
-func move_cursor_left(n int) {
-	for range n {
-		fmt.Print("\b")
-	}
-}
-
-func move_cursor_right(n int) {
-	for range n {
-		fmt.Print("\x1b[1C")
-	}
-}
-
 func read_line(cfg *config, stdin *bufio.Reader) (string, error) {
 	line := &line_state{
-		line:                   make([]byte, 0),
-		prev_line:              make([]byte, 0),
-		history_idx:            -1,
-		next_tab_auto_complete: false,
+		line:             make([]byte, 0),
+		prev_line:        make([]byte, 0),
+		history_idx:      -1,
+		show_all_matches: false,
 	}
 
 	fmt.Print(cfg.shell_prompt())
@@ -382,7 +249,7 @@ func read_line(cfg *config, stdin *bufio.Reader) (string, error) {
 		}
 
 		if char != '\t' {
-			line.next_tab_auto_complete = false
+			line.show_all_matches = false
 		}
 	}
 }

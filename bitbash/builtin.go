@@ -172,8 +172,7 @@ func HandlerType(cmd *Command, cfg *config) {
 				continue
 			}
 
-			// Ensure that file is executable
-			if info.Mode()&0111 != 0 {
+			if is_exec := info.Mode()&0111 != 0; is_exec {
 				fmt.Fprintf(cmd.Stdout, "%s is %s\r\n", commandArg, filepath.Join(dir, commandArg))
 				return
 			}
