@@ -1,5 +1,7 @@
 package main
 
+import "os"
+
 const (
 	EOT = byte(4)   // Sent when pressed  Ctrl+D
 	DEL = byte(127) // Sent when pressed Backspace
@@ -25,16 +27,16 @@ const (
 	NOT_IN_HISTORY = -1
 )
 
-var REDIRECTION_OPS = map[string]bool{
-	"<":   true,
-	">":   true,
-	"1>":  true,
-	"2>":  true,
-	"&>":  true,
-	">>":  true,
-	"1>>": true,
-	"2>>": true,
-	"&>>": true,
+var REDIRECTION_OPS = map[string]int{
+	"<":   os.O_RDONLY,
+	">":   os.O_WRONLY | os.O_CREATE | os.O_TRUNC,
+	"1>":  os.O_WRONLY | os.O_CREATE | os.O_TRUNC,
+	"2>":  os.O_WRONLY | os.O_CREATE | os.O_TRUNC,
+	"&>":  os.O_WRONLY | os.O_CREATE | os.O_TRUNC,
+	">>":  os.O_WRONLY | os.O_CREATE | os.O_APPEND,
+	"1>>": os.O_WRONLY | os.O_CREATE | os.O_APPEND,
+	"2>>": os.O_WRONLY | os.O_CREATE | os.O_APPEND,
+	"&>>": os.O_WRONLY | os.O_CREATE | os.O_APPEND,
 }
 
 var BUILTIN_CMDS map[string]BuiltInCommand

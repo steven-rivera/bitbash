@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/user"
 	"strings"
-	"sync"
 
 	"golang.org/x/term"
 )
@@ -29,12 +28,12 @@ func NewConfig() *Config {
 
 	cfg := &Config{
 		StdinReader:      stdin,
-		UserName:         usr.Name,
+		UserName:         usr.Username,
 		CurrentDirectory: dir,
 		HomeDirectory:    home,
 	}
 
-	cfg.loadCommandHistory()
+	cfg.LoadCommandHistory()
 
 	return cfg
 }
@@ -49,17 +48,17 @@ func (cfg *Config) RestoreTerminal() {
 }
 
 func (cfg *Config) ShellPrompt() string {
-	//if cut, ok := strings.CutPrefix(cfg.currDirectory, cfg.homeDirectory); ok {
-	//	cfg.currDirectory = fmt.Sprintf("~%s", cut)
-	//}
-	//userNameBlueBold := fmt.Sprintf("%s%s%s%s", BLUE, BOLD, cfg.userName, RESET)
-	//currDirGreenBold := fmt.Sprintf("%s%s%s%s", GREEN, BOLD, cfg.currDirectory, RESET)
-	//return fmt.Sprintf("%s:%s $ ", userNameBlueBold, currDirGreenBold)
+	if cut, ok := strings.CutPrefix(cfg.CurrentDirectory, cfg.HomeDirectory); ok {
+		cfg.CurrentDirectory = fmt.Sprintf("~%s", cut)
+	}
+	userNameBlueBold := fmt.Sprintf("%s%s%s%s", BLUE, BOLD, cfg.UserName, RESET)
+	currDirGreenBold := fmt.Sprintf("%s%s%s%s", GREEN, BOLD, cfg.CurrentDirectory, RESET)
+	return fmt.Sprintf("%s:%s $ ", userNameBlueBold, currDirGreenBold)
 
-	return "$ "
+	//return "$ "
 }
 
-func (cfg *Config) loadCommandHistory() {
+func (cfg *Config) LoadCommandHistory() {
 	cfg.History = make([]string, 0)
 
 	path, ok := os.LookupEnv("HISTFILE")
@@ -81,7 +80,7 @@ func (cfg *Config) loadCommandHistory() {
 	cfg.SavedUpToIndex = len(cfg.History)
 }
 
-func printWelcomeMessage() {
+func PrintWelcomeMessage() {
 	fmt.Print(GREEN)
 	fmt.Print(`________   ___   _________   ________   ________   ________   ___  ___      `, "\r\n")
 	fmt.Print(`|\   __  \ |\  \ |\___   ___\|\   __  \ |\   __  \ |\   ____\ |\  \|\  \    `, "\r\n")
@@ -96,33 +95,10 @@ func printWelcomeMessage() {
 	fmt.Print("\r\n", "Welcome to BitBash! Type `help` for a list of builtin commands.", "\r\n\r\n")
 }
 
-func Execute(cfg *Config, input string) {
-	tokens, err := Tokenize(input)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "shell: %s\n", err)
-		return
-	}
-
-	pipeLine, err := CreatePipeline(tokens)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "shell: %s\n", err)
-		return
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(len(pipeLine))
-
-	for _, cmd := range pipeLine {
-		go cmd.Run(&wg, cfg)
-	}
-
-	wg.Wait()
-}
-
 func RunREPL(cfg *Config) error {
 	defer cfg.RestoreTerminal()
 
-	//printWelcomeMessage()
+	PrintWelcomeMessage()
 
 	for {
 		cfg.MakeTerminalRaw()
@@ -143,7 +119,13 @@ func RunREPL(cfg *Config) error {
 
 		cfg.History = append(cfg.History, input)
 
-		Execute(cfg, input)
+		tokens, err := Tokenize(input)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "shell: %s\n", err)
+			continue
+		}
+
+		NewPipeline(tokens).Execute(cfg)
 	}
 }
 

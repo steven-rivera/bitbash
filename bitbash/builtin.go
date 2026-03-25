@@ -12,7 +12,7 @@ import (
 type BuiltInCommand struct {
 	Name        string
 	Usage       string
-	Description string
+	Description []string
 	Handler     func(cmd *Command, cfg *Config)
 }
 
@@ -125,7 +125,11 @@ func HandlerHelp(cmd *Command, cfg *Config) {
 	fmt.Fprint(cmd.out, "Commands:\n")
 	for _, builtin := range BUILTIN_CMDS {
 		fmt.Fprintf(cmd.out, "    %s\n", builtin.Usage)
-		fmt.Fprintf(cmd.out, "      -%s\n\n", builtin.Description)
+		for _, line := range builtin.Description {
+			fmt.Fprintf(cmd.out, "      - %s\n", line)
+		}
+		fmt.Fprintf(cmd.out, "\n")
+		
 	}
 }
 
@@ -207,50 +211,55 @@ func init() {
 
 	BUILTIN_CMDS["exit"] = BuiltInCommand{
 		Name:        "exit",
-		Usage:       "exit [<code>]",
-		Description: "cause the shell to exit with provided code",
+		Usage:       "exit [CODE]",
+		Description: []string{"cause the shell to exit with provided code, default is 0"},
 		Handler:     HandlerExit,
 	}
 
 	BUILTIN_CMDS["echo"] = BuiltInCommand{
 		Name:        "echo",
-		Usage:       "echo [arg...]",
-		Description: "print all arguments separated by a space to stdout",
+		Usage:       "echo [ARG...]",
+		Description: []string{"print all arguments separated by a space to stdout"},
 		Handler:     HandlerEcho,
 	}
 
 	BUILTIN_CMDS["type"] = BuiltInCommand{
 		Name:        "type",
-		Usage:       "type <command>",
-		Description: "print whether command is builtin, if not print location of executatable",
+		Usage:       "type COMMAND",
+		Description: []string{"print whether COMMAND is builtin, if not print location of executatable"},
 		Handler:     HandlerType,
 	}
 
 	BUILTIN_CMDS["pwd"] = BuiltInCommand{
 		Name:        "pwd",
 		Usage:       "pwd",
-		Description: "print the current working directory",
+		Description: []string{"print the current working directory"},
 		Handler:     HandlerPwd,
 	}
 
 	BUILTIN_CMDS["cd"] = BuiltInCommand{
 		Name:        "cd",
-		Usage:       "cd <directory>",
-		Description: "change the current working directory to the provided directory",
+		Usage:       "cd DIR",
+		Description: []string{"change the current working directory to the provided directory"},
 		Handler:     HandlerCd,
 	}
 
 	BUILTIN_CMDS["help"] = BuiltInCommand{
 		Name:        "help",
 		Usage:       "help",
-		Description: "print this help message",
+		Description: []string{"print this help message"},
 		Handler:     HandlerHelp,
 	}
 
 	BUILTIN_CMDS["history"] = BuiltInCommand{
-		Name:        "history",
-		Usage:       "history [<n> | (-r|-w|-a) <path_to_history_file>]",
-		Description: "list previously executed commands or load/write/append commands from/to a file",
-		Handler:     HandlerHistory,
+		Name:  "history",
+		Usage: "history [N | (-r|-w|-a) FILE]",
+		Description: []string{
+			"list all previously executed commands or last N.",
+			"-r: read history from FILE and add it to current history",
+			"-w: write current history to FILE",
+			"-a: append current history to FILE",
+		},
+		Handler: HandlerHistory,
 	}
 }
