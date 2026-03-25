@@ -3,8 +3,8 @@ package main
 import "os"
 
 const (
-	EOT = byte(4)   // Sent when pressed  Ctrl+D
-	DEL = byte(127) // Sent when pressed Backspace
+	EOT = byte(4)   // Sent when Ctrl+D pressed
+	DEL = byte(127) // Sent when Backspace pressed
 	ESC = byte(27)
 
 	RESET             = "\x1b[0m"
