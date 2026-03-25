@@ -9,19 +9,20 @@ import (
 	"testing"
 )
 
-// Needed so that text printed to stdout when function is tested
-// isn't printed to `go test` output if function fails test
-func capture_stdout(f func()) string {
+// Needed so that text isn't printed to stdout when function is tested
+
+func captureStdout(f func()) string {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
+
 	os.Stdout = w
-
 	f()
-
-	w.Close()
 	os.Stdout = old
 
+	w.Close()
 	out, _ := io.ReadAll(r)
+	r.Close()
+	
 	return string(out)
 }
 
@@ -52,7 +53,7 @@ func TestReadLine(t *testing.T) {
 			expected: "echo",
 		},
 		{
-			name:     "move cursor back",
+			name:     "move cursor back and insert space",
 			input:    fmt.Sprintf("echo%s \n", CURSOR_BACK),
 			expected: "ech o",
 		},
@@ -88,8 +89,10 @@ func TestReadLine(t *testing.T) {
 
 			var result string
 
-			_ = capture_stdout(func() {
-				result, _ = read_line(&config{}, bufio.NewReader(strings.NewReader(tc.input)))
+			_ = captureStdout(func() {
+				result, _ = ReadLine(&Config{
+					StdinReader: bufio.NewReader(strings.NewReader(tc.input)),
+				})
 			})
 
 			if result != tc.expected {

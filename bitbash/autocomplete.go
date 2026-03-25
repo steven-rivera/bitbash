@@ -6,70 +6,103 @@ import (
 	"strings"
 )
 
-type prefix struct {
-	dir  string
-	base string
+type Prefix struct {
+	Directory  string
+	PrefixBase string
+	IsCmd      bool
 }
 
-type match struct {
-	name    string
-	prefix  prefix
-	is_dir  bool
-	is_exec bool
-}
-
-func (m match) full_path() string {
-	return m.prefix.dir + m.name
-}
-
-func auto_complete_prefix(prefix prefix, is_cmd bool) []match {
-	if prefix.dir == "" && is_cmd {
-		return cmds_with_prefix(prefix)
-	}
-
-	if prefix.dir == "" {
-		return files_with_prefix(prefix, ".")
-	}
-	return files_with_prefix(prefix, prefix.dir)
-}
-
-func cmds_with_prefix(prefix prefix) []match {
-	matches := []match{}
-
-	for command := range GetBuiltInCommands() {
-		if strings.HasPrefix(command, prefix.base) {
-			return append(matches, match{
-				name:   command,
-				prefix: prefix,
-			})
+func NewPrefix(prefixStr string, isCmd bool) Prefix {
+	idx := strings.LastIndexByte(prefixStr, '/')
+	if idx == -1 {
+		return Prefix{
+			Directory:  "",
+			PrefixBase: prefixStr,
+			IsCmd:      isCmd,
 		}
 	}
+	return Prefix{
+		Directory:  prefixStr[:idx+1],
+		PrefixBase: prefixStr[idx+1:],
+		IsCmd:      isCmd,
+	}
+}
 
-	for dir := range strings.SplitSeq(os.Getenv("PATH"), ":") {
-		for _, match := range files_with_prefix(prefix, dir) {
-			if match.is_exec {
+type Match struct {
+	PrefixDirectory string
+	Match           string
+	IsDir           bool
+	IsExec          bool
+}
+
+func (m Match) ToString() string {
+	return m.PrefixDirectory + m.Match
+}
+
+func AutoCompletePrefix(prefix Prefix) []Match {
+	if prefix.IsCmd {
+		return CommandsWithPrefix(prefix)
+	}
+
+	if prefix.Directory == "" {
+		return FilesWithPrefix(prefix, ".")
+	}
+
+	return FilesWithPrefix(prefix, prefix.Directory)
+}
+
+func CommandsWithPrefix(prefix Prefix) []Match {
+	matches := []Match{}
+
+	// If Prefix struct has no directory then search builtin commands and commands
+	// in PATH that have the prefix prefix.PrefixBase, else search for commands with
+	// the prefix prefix.PrefixBase only in the directory prefix.Directory
+
+	if prefix.Directory == "" {
+		for command := range BUILTIN_CMDS {
+			if strings.HasPrefix(command, prefix.PrefixBase) {
+				return append(matches, Match{
+					PrefixDirectory: prefix.Directory,
+					Match:           command,
+					IsDir:           false,
+					IsExec:          true,
+				})
+			}
+		}
+
+		for dir := range strings.SplitSeq(os.Getenv("PATH"), ":") {
+			for _, match := range FilesWithPrefix(prefix, dir) {
+				if match.IsExec {
+					matches = append(matches, match)
+				}
+			}
+		}
+
+	} else {
+		for _, match := range FilesWithPrefix(prefix, prefix.Directory) {
+			if match.IsExec {
 				matches = append(matches, match)
 			}
 		}
 	}
 
-	slices.SortFunc(matches, func(a, b match) int {
-		return strings.Compare(a.name, b.name)
+	slices.SortFunc(matches, func(a, b Match) int {
+		return strings.Compare(a.Match, b.Match)
 	})
 
 	return matches
 }
 
-func files_with_prefix(prefix prefix, search_dir string) []match {
-	entries, err := os.ReadDir(search_dir)
+func FilesWithPrefix(prefix Prefix, searchDirectory string) []Match {
+	entries, err := os.ReadDir(searchDirectory)
 	if err != nil {
-		return []match{}
+		return []Match{}
 	}
 
-	matches := []match{}
+	matches := []Match{}
 
 	for _, entry := range entries {
-		if !strings.HasPrefix(entry.Name(), prefix.base) {
+		if !strings.HasPrefix(entry.Name(), prefix.PrefixBase) {
 			continue
 		}
 
@@ -80,47 +113,33 @@ func files_with_prefix(prefix prefix, search_dir string) []match {
 
 		is_exec := !entry.IsDir() && info.Mode()&0111 != 0
 
-		matches = append(matches, match{
-			name:    entry.Name(),
-			prefix:  prefix,
-			is_dir:  entry.IsDir(),
-			is_exec: is_exec,
+		matches = append(matches, Match{
+			PrefixDirectory: prefix.Directory,
+			Match:           entry.Name(),
+			IsDir:           entry.IsDir(),
+			IsExec:          is_exec,
 		})
 	}
 
-	slices.SortFunc(matches, func(a, b match) int {
-		return strings.Compare(a.name, b.name)
+	slices.SortFunc(matches, func(a, b Match) int {
+		return strings.Compare(a.Match, b.Match)
 	})
 
 	return matches
 }
 
-func parse_prefix(prefix_str string) prefix {
-	idx := strings.LastIndexByte(prefix_str, '/')
-	if idx == -1 {
-		return prefix{
-			dir:  "",
-			base: prefix_str,
-		}
-	}
-	return prefix{
-		dir:  prefix_str[:idx+1],
-		base: prefix_str[idx+1:],
-	}
-}
-
-func longest_common_match_prefix(matches []match) string {
+func LongestCommonPrefix(matches []Match) string {
 	lcp := strings.Builder{}
 	for i := 0; ; i++ {
 		var currChar byte
 		for j, match := range matches {
-			if i >= len(match.name) {
+			if i >= len(match.Match) {
 				return lcp.String()
 			}
 			if j == 0 {
-				currChar = match.name[i]
+				currChar = match.Match[i]
 			}
-			if match.name[i] != currChar {
+			if match.Match[i] != currChar {
 				return lcp.String()
 			}
 		}
@@ -128,11 +147,11 @@ func longest_common_match_prefix(matches []match) string {
 	}
 }
 
-func join_matches(matches []match) string {
+func JoinMatches(matches []Match) string {
 	matches_str := ""
 	for _, match := range matches {
-		matches_str += match.name
-		if match.is_dir {
+		matches_str += match.Match
+		if match.IsDir {
 			matches_str += "/  "
 		} else {
 			matches_str += "  "

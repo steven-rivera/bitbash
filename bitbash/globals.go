@@ -1,7 +1,5 @@
 package main
 
-import "fmt"
-
 const (
 	EOT = byte(4)   // Sent when pressed  Ctrl+D
 	DEL = byte(127) // Sent when pressed Backspace
@@ -23,16 +21,20 @@ const (
 	MAGENTA = "\x1b[35m"
 	CYAN    = "\x1b[36m"
 	WHITE   = "\x1b[37m"
+
+	NOT_IN_HISTORY = -1
 )
 
-func move_cursor_back(n int) {
-	for range n {
-		fmt.Print("\b")
-	}
+var REDIRECTION_OPS = map[string]bool{
+	"<":   true,
+	">":   true,
+	"1>":  true,
+	"2>":  true,
+	"&>":  true,
+	">>":  true,
+	"1>>": true,
+	"2>>": true,
+	"&>>": true,
 }
 
-func move_cursor_forward(n int) {
-	for range n {
-		fmt.Print(CURSOR_FORWARD)
-	}
-}
+var BUILTIN_CMDS map[string]BuiltInCommand

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestSplitInput(t *testing.T) {
+func TestTokenize(t *testing.T) {
 	testCases := []struct {
 		name     string
 		input    string
@@ -91,10 +91,26 @@ func TestSplitInput(t *testing.T) {
 			input:    `echo "example\"insidequotes"hello\"`,
 			expected: []string{"echo", `example"insidequoteshello"`},
 		},
+		{
+			name:     "piped command",
+			input:    `cat README.md | grep 'bitbash'`,
+			expected: []string{"cat", "README.md", "|", "grep", "bitbash"},
+		},
+		{
+			name:     "redirection",
+			input:    `echo "Maria says Error" 2>> /tmp/bee/pig.md`,
+			expected: []string{"echo", "Maria says Error", "2>>", "/tmp/bee/pig.md"},
+		},
+		{
+			name:     "multiple redirections",
+			input:    "cat README.md > file.txt 2> errors.txt",
+			expected: []string{"cat", "README.md", ">", "file.txt", "2>", "errors.txt"},
+		},
 	}
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res, _ := SplitInput(tc.input)
+			res, _ := Tokenize(tc.input)
 			if !reflect.DeepEqual(res, tc.expected) {
 				t.Fatalf("expected: %#v, got: %#v", tc.expected, res)
 			}
