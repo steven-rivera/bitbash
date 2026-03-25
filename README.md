@@ -19,8 +19,8 @@
 
 ### Autocomplete
 
-- `TAB`: Attempt to complete or partially complete a command/file name
-- `TAB TAB`: If multiple matches exist, print all possible completions
+- `<TAB>`: Attempt to complete or partially complete a command or file name
+- `<TAB><TAB>`: If multiple matches exist, print all possible completions
 
 ###  Quoting
 
@@ -36,25 +36,23 @@
 
 Bitbash comes with the following builtin commands:
 
+- `cd`: Changes the current working directory
+- `echo`: Print all arguments to `stdout`
+- `exit`: Exit the shell with the provided code. Default `0`
 - `help`: Prints more detailed information about builtin commands
-- `exit [CODE]`: Exit the shell with code `CODE`. Default `0`
-- `echo [ARG]...`: Print all arguments to `stdout`
-- `type CMD`: Provide information about `CMD`
+- `history`: Prints previously executed commands
 - `pwd`: Prints the current working directory
-- `cd [DIR]`: change the current working directory to `DIR`
-- `history`: prints previously executed commands
+- `type`: Provide information about a command
 
 ## History
 
 Command history can optionally be saved and loaded from a file. Bitbash will load/save command history on startup/exit from the file specified in the `HISTFILE` environment variable. This allows history to persist between sessions of the Bitbash shell.
 
-- `history.txt`: This repo provides a sample history file with example commands
+- `history.txt`: sample history file
 
-## Running
+## Installing
 
-### Installing
-
-You can run BitBash by installing it as an executable using:
+You can installing BitBash by running the following command:
 
 ```bash
 go install github.com/steven-rivera/bitbash/bitbash@latest
@@ -62,19 +60,11 @@ go install github.com/steven-rivera/bitbash/bitbash@latest
 
 Once installed you can simply run:
 
-```
+```bash
 HISTFILE="history.txt" bitbash
 ```
 
 You should now be inside the BitBash shell!
-
-### Without Installing
-
-You can also run Bitbash without installing and executable by cloning the repo and running the `run.sh` script
-
-```bash
-git clone https://github.com/steven-rivera/bitbash && ./run.sh
-```
 
 ## Requirements
 
