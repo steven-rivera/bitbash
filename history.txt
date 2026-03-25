@@ -1,3 +1,4 @@
 help
 grep -i -n "error" /var/log/syslog > errors.txt
+echo 'one two three' | tr ' ' '\n' | sort
 ps aux | awk '{printf "USER=%s PID=%s\n", $1, $2}' | grep "(postgres|root)" -En --color=always
